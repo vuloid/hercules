@@ -1,0 +1,60 @@
+name: Update catalog
+
+on:
+  schedule:
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+    inputs:
+      max_repos:
+        description: Maximum repositories to inspect
+        required: false
+        default: "150"
+  push:
+    paths:
+      - "indexer/**"
+      - ".github/workflows/update-catalog.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-catalog
+  cancel-in-progress: true
+
+jobs:
+  catalog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build catalog
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          python indexer/build_catalog.py
+          --out catalog/modules.json
+          --max-repos ${{ github.event.inputs.max_repos || '150' }}
+
+      - name: Validate catalog
+        run: python indexer/build_catalog.py --validate-only catalog/modules.json
+
+      - name: Commit catalog
+        run: |
+          if [ -z "$(git status --porcelain -- catalog/modules.json)" ]; then
+            echo "Catalog is already up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalog/modules.json
+          git commit -m "chore: refresh module catalog"
+          git push

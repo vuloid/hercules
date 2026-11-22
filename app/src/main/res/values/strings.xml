@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Hercules</string>
+
+    <string name="tab_catalog">Catalog</string>
+    <string name="tab_installed">Installed</string>
+
+    <string name="search_hint">Search modules or paste a GitHub URL</string>
+    <string name="search_clear">Clear</string>
+    <string name="search_paste">Paste</string>
+
+    <string name="filter_all">All</string>
+    <string name="filter_magisk">Magisk</string>
+    <string name="filter_kernelsu">KernelSU</string>
+    <string name="filter_apatch">APatch</string>
+    <string name="filter_lsposed">LSPosed</string>
+    <string name="sort_recent">Recently Updated</string>
+    <string name="sort_stars">Most Stars</string>
+    <string name="filter_hide_outdated">Hide Outdated (&gt;1 yr)</string>
+
+    <string name="catalog_empty">No modules match the current filters</string>
+    <string name="catalog_error">Failed to load catalog: %1$s</string>
+    <string name="github_resolving">Resolving repository</string>
+    <string name="github_failed">Could not read repository: %1$s</string>
+
+    <string name="action_install">Install</string>
+    <string name="action_update">Update</string>
+    <string name="action_retry">Retry</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="action_reboot">Reboot</string>
+    <string name="action_close">Close</string>
+    <string name="action_download_zip">Download ZIP</string>
+    <string name="action_download_apk">Download APK</string>
+    <string name="action_inspect_scripts">Inspect Scripts</string>
+    <string name="action_hide_scripts">Hide Scripts</string>
+
+    <string name="label_file_size">File size</string>
+    <string name="label_source">Source</string>
+    <string name="section_description">Description</string>
+    <string name="section_changelog">Changelog</string>
+    <string name="section_scripts">Script safety check</string>
+
+    <string name="scripts_loading">Reading scripts</string>
+    <string name="scripts_failed">Could not read scripts: %1$s</string>
+    <string name="scripts_none_found">No shell scripts found in this package</string>
+    <string name="scripts_clean">No suspicious patterns found in %1$d script files</string>
+    <string name="scripts_truncated">Showing the first %1$d lines</string>
+
+    <string name="severity_high">HIGH</string>
+    <string name="severity_medium">MEDIUM</string>
+    <string name="severity_low">LOW</string>
+    <string name="finding_pipe_to_shell">Downloads content and pipes it into a shell</string>
+    <string name="finding_destructive_delete">Recursive delete on a system path</string>
+    <string name="finding_raw_disk_write">Writes directly to a block device</string>
+    <string name="finding_remote_fetch">Fetches data from the network</string>
+    <string name="finding_obfuscated_exec">Decodes or evaluates dynamic code</string>
+    <string name="finding_selinux_disable">Sets SELinux to permissive</string>
+    <string name="finding_permissive_chmod">Grants world-writable permissions</string>
+
+    <string name="console_title">Installing %1$s</string>
+    <string name="phase_downloading">Downloading</string>
+    <string name="phase_installing">Installing</string>
+    <string name="phase_success">Done</string>
+    <string name="phase_failed">Failed</string>
+    <string name="log_downloading">Downloading %1$s</string>
+    <string name="log_downloaded">Download complete</string>
+    <string name="log_download_failed">Download failed: %1$s</string>
+    <string name="log_download_failed_generic">Download failed</string>
+    <string name="log_no_root">No supported root manager found, or root access was denied</string>
+    <string name="log_manager_mismatch">This package does not list %1$s as supported</string>
+    <string name="log_installing_with">Installing with %1$s</string>
+    <string name="log_success">Installation finished. Reboot to apply.</string>
+    <string name="log_exit_code">Installer exited with code %1$s</string>
+
+    <string name="installed_title">Installed</string>
+    <string name="installed_updates">Updates available (%1$d)</string>
+    <string name="installed_up_to_date">Installed (%1$d)</string>
+    <string name="installed_empty">No modules found in /data/adb/modules</string>
+    <string name="installed_no_root">Root access is required to list installed modules</string>
+    <string name="badge_disabled">disabled</string>
+</resources>

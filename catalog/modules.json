@@ -1,0 +1,170 @@
+{
+  "modules": [
+    {
+      "id": "zygisk_vector",
+      "name": "Vector",
+      "author": "JingMatrix",
+      "description": "A modern, Xposed-compatible framework for Android application hooking. (Android 8.1 ~ 17)",
+      "version": "v2.2 (3080-88f8e1fa-JingMatrix-Vector)",
+      "versionCode": 3080,
+      "stars": 13272,
+      "updatedAt": 1794793566000,
+      "sizeBytes": 36944715,
+      "downloadUrl": "https://github.com/JingMatrix/Vector/releases/download/v2.2/Vector-v2.2-3080-Debug.zip",
+      "repoUrl": "https://github.com/JingMatrix/Vector",
+      "managers": [
+        "MAGISK",
+        "KERNELSU"
+      ],
+      "lsposed": true,
+      "readme": "Vector Framework\n\nA high-performance ART hooking framework for modern Android\n\nIntroduction\n\nVector is a Zygisk module providing an ART hooking framework that maintains API consistency with the original Xposed. It is engineered on top of LSPlant to deliver a stable, native-level instrumentation environment.\n\nThe framework allows modules to modify system and application behavior in-memory. Because no APK files are modified, changes are non-destructive, easily reversible via reboot, and compatible across various ROMs and Android versions.\n\nCompatibility\n\nVector supports devices running Android 8.1 through Android 17 Beta.\n\nThis framework requires a recent installation of Magisk or KernelSU with Zygisk enabled.\n\nInstallation\n\n1. Download the latest release as a system module.\n2. Install the module via your root manager (Magisk/KernelSU).\n3. Ensure a Zygisk environment (e.g., NeoZygisk).\n4. Reboot the device.\n5. Access management settings via the system notification.\n\nDownloads\n\n| Channel | Source |\n| :--- | :--- |\n| Stable Releases | GitHub Releases |\n| Canary (CI) Builds | GitHub Actions |\n\nDebug builds are recommended for users encountering issues or performing troubleshooting.\nWe encourage users to test CI builds to help us identify bugs and accelerate development.\n\nGitHub requires users to be logged in to download CI artifacts.\nThe link above is filtered to show only master branch builds.\nPlease note that builds from Pull Requests (PRs) are often unstable and potentially unsafe (depending on the authors); we recommend staying on the master branch for verified builds, unless you are asked to help our debugging sessions.\n\nSupport and Contribution\n\nIf you encounter issues or wish to help improve the project, please refer to the resources below.\n- Troubleshooting: Consult the guide before reporting bugs.\n- Discussions: Join our community on GitHub Discussions.\n- Localization: Help translate the project via Crowdin.\n\nBug reports are only accepted if they are based on the latest debug build.\n*Notice for Chinese speakers:*\n为了提高沟通效率，本项目仅接受英文 Issue。请使用 DeepL 或其他翻译工具提交您的反馈。\n\nDeveloper Resources\n\nVector supports both legacy and modern hooking standards to ensure broad module compatibility.\n- Legacy Xposed API\n- Modern libxposed API\n- Xposed Module Repository\n\nVector supports the libxposed API via two git submodules: the module API and the service API.\nA successful GitHub Actions build of the master branch indicates that Vector fully supports these APIs at those specific commits.\nDevelopers are suggested to check out the same commits as Vector.\n\nCredits\n\nThis project is made possible by the following open-source contributions:\n- Magisk: The foundation of Android customization.\n- LSPlant: The core ART hooking engine.\n- XposedBridge: The standard Xposed APIs.\n- Dobby: Inline hooking implementation.\n- LSPosed: Upstream source.\n- EdXposed: Upstream source, before LSPosed.\n- xz-embedded: Library decompression utilities.\n\nLegacy and Historical Dependencies\n- ~~Riru~~\n- ~~SandHook~~\n- ~~YAHFA~~\n- ~~dexmaker~~\n- ~~DexBuilder~~\n\nLicense\n\nVector is licensed under the GNU General Public License v3.",
+      "changelog": "🎉 Vector 2.2 🎉\n\nVector 2.2 is a hotfix for 2.1, and it brings libxposed API 102 — where a module can be swapped out without taking the process down with it.\n\nIf you installed the manager as a separate app, uninstall it before updating: a 2.1 manager cannot talk to a 2.2 daemon. A parasitic manager needs nothing.\n\n🩹 What 2.1 got wrong\n- 🪝 No hooks in release builds. Modules loaded, and then nothing happened. R8 had merged XResources into a shared class that XposedHelpers.findClass touches on its way in, and XResources cannot resolve until the device has generated its super class. One failure is permanent, so every findClass in system_server failed for the rest of the boot.\n- 🔗 Canaries installed the wrong build. Press install on a canary, get the newest release. The page is rebuilt around the builds themselves: each row a head commit, with its author, its pull request, and the issues closed since the build you are running.\n\n🔁 libxposed API 102\nHot reload — a module's code replaced inside a process that is already running it. No more killing every process you are injected into to try a change, and no more reboot when the module hooks the system, taking with it the state you were trying to reproduce. Updates can reach processes still running the old code, if the module agrees to it. Around that: an entry class can step out of lifecycle callbacks while its siblings carry on, hookers swap atomically, and a module targeting 102 leaves the legacy API alone.\n\n👥 One module, one configuration\nA module is one package and one binary for the whole device, so its configuration belongs to the package; only its presence varies per user. Nothing enforced that, and a module installed in one user could run inside another user's applications. It now runs only in the users that installed it — system_server excepted, since it belongs to none of them.\n\n🧹 Everything else\nThe IPC interfaces moved into Vector's own namespace, and the refactor shook out a run of unrelated bugs: JNI exceptions left pending across the native boundary, one of which left a process without Xposed while the log announced success; \"Install as an app\" going green for a copy that was a different build; an unbounded wait on a binder thread; a health flag latched before the work it reports. And the monochrome icon now carries the statue's own line work, so the themed launcher icon finally says what it is.\n\n*The two fixes at the top exist because you reported them. Thank you — please keep telling us what breaks.*"
+    },
+    {
+      "id": "zygisksu",
+      "name": "Zygisk Next",
+      "author": "LSPosed Developers",
+      "description": "Standalone implementation of Zygisk.",
+      "version": "1.5.3 (880-22a1bf5-release)",
+      "versionCode": 880,
+      "stars": 11115,
+      "updatedAt": 1794156512000,
+      "sizeBytes": 6638473,
+      "downloadUrl": "https://github.com/Dr-TSNG/ZygiskNext/releases/download/v1.5.3/Zygisk-Next-1.5.3-880-22a1bf5-release.zip",
+      "repoUrl": "https://github.com/Dr-TSNG/ZygiskNext",
+      "managers": [
+        "MAGISK",
+        "KERNELSU"
+      ],
+      "lsposed": false,
+      "readme": "Zygisk Next\n\nStandalone implementation of Zygisk, providing Zygisk API support for KernelSU and a replacement of Magisk's built-in Zygisk.\n\nRequirements\n\nGeneral\n- No multiple root implementation installed\n\nKernelSU\n- Minimal KernelSU version: 10940\n- Minimal KernelSU Manager (ksud) version: 11575\n\nMagisk\n- Minimal version: 26402\n- Built-in Zygisk turned off\n\nTranslations\n\nYou can contribute to translations for the WebUI via making pull requests to the i18n branch.\n\nZygisk Next API\n\nZygisk Next provides an API for injecting into init-oriented processes. See zygisk_next_api.h for more information.\n\nExample usage can be found in ZygiskNextModuleSample.\n\nZygisk Next also supports application callbacks for HyperOS Rust Runtime, which are documented in docs/hyos_runtime.md. This is a native-only API and does not provide ART or JNI compatibility to regular Zygisk modules.\n\nCopyright Notice\n\nCopyright © 2024-2026 Zygisk Next developers. All rights reserved.\n\nThe software Zygisk Next, starting from version v4-0.9.2, is no longer under the GPL-3.0 License. Instead, all rights to the software are reserved by the owner.\n\nThe following conditions now apply:\n\n1. No Modifications: The software may not be modified in any way. This includes but is not limited to changing, adding, or removing any part of the software's code or functionality.\n\n2. No Redistribution: The software may not be redistributed in any form. This includes but is not limited to renaming, selling, or including the software as part of another project.\n\n3. No Picking: No parts, pieces, or components of the software may be extracted and submitted to other projects. This includes, but is not limited to, code snippets, functions, and released binaries.\n\n4. No Claim to Succession: Any fork of the software that was created before the license change may not claim to be an official or unofficial successor to the project. This includes but is not limited to using the project's name, branding, or reputation to imply a connection to the original project.",
+      "changelog": "适配 Android 17 QPR3\n修复一些死锁问题\n修复 16KB 页面兼容问题\n修复其他问题\n\nAdded support for Android 17 QPR3\nFixed some deadlock issues\nFixed compatibility with 16 KB page sizes\nFixed some other issues\n\nSHA256: 186a0a26c9fcb895af1954b42de831433c23d72d1bd0758b986069154359db67"
+    },
+    {
+      "id": "tricky_store",
+      "name": "Tricky Store",
+      "author": "5ec1cff, aviraxp and Cyberenchanter",
+      "description": "A trick of keystore",
+      "version": "v1.4.1 (245-72b2e84-release)",
+      "versionCode": 245,
+      "stars": 6497,
+      "updatedAt": 1764507948000,
+      "sizeBytes": 2840600,
+      "downloadUrl": "https://github.com/5ec1cff/TrickyStore/releases/download/1.4.1/Tricky-Store-v1.4.1-245-72b2e84-release.zip",
+      "repoUrl": "https://github.com/5ec1cff/TrickyStore",
+      "managers": [
+        "MAGISK",
+        "KERNELSU",
+        "APATCH"
+      ],
+      "lsposed": false,
+      "readme": "Tricky Store\n\nA trick of keystore. Android 10 or above is required.\n\nThis module is used for modifying the certificate chain generated for android key attestation.\n\n中文 README\n\nStop opening source\n\nDue to the rampant misuse and the contributions received after open-sourcing being less than expected, this module will be closed-source starting from version 1.1.0.\n\nUsage\n\n1. Flash this module and reboot.\n2. For more than DEVICE integrity, put an unrevoked hardware keybox.xml at /data/adb/tricky_store/keybox.xml (Optional).\n3. Customize target packages at /data/adb/tricky_store/target.txt (Optional).\n4. Enjoy!\n\nAll configuration files will take effect immediately.\n\nkeybox.xml\n\nformat:\n\n    1\n\n-----BEGIN EC PRIVATE KEY-----\n...\n-----END EC PRIVATE KEY-----\n\n                ...\n\n-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n\n                ... more certificates\n\n        ...\n\nSupport TEE broken devices\n\nTricky Store will hack the leaf certificate by default.\nOn TEE broken devices, this will not work because we can't retrieve the leaf certificate from TEE.\nIn this case, we fallback to use generate key mode automatically.\n\nYou can add a ! after a package name to force use generate certificate support for this package.\nAlso, you can add a ? after a package name to force use leaf hack mode for this package.\n\nFor example:\n\ntarget.txt\nuse auto mode for KeyAttestation App\nio.github.vvb2060.keyattestation\nalways use leaf hack mode\nio.github.vvb2060.mahoshojo?\nalways use certificate generating mode for gms\ncom.google.android.gms!\n\nCustomize security patch level (1.2.1+)\n\nCreate the file /data/adb/tricky_store/security_patch.txt.\n\nSimple:\n\nHack os/vendor/boot security patch level\n20241101\n\nAdvanced:\n\nos security patch level is 202411\nsystem=202411\ndo not hack boot patch level\nboot=no\nvendor patch level is 20241101 (another format)\nvendor=2024-11-01\ndefault value\nall=20241101\nkeep consistent with system prop\nsystem=prop\n\nNote: this feature will only hack the result of KeyAttestation, it will not do resetprop, you need do it yourself.\n\nAcknowledgement\n- FrameworkPatch\n- BootloaderSpoofer\n- KeystoreInjection\n- LSPosed",
+      "changelog": "- 修复一些问题\n- Fix some issues\n\nSHA256: 2f5e73fcba0e4e43b6e96b38f333cbe394873e3a81cf8fe1b831c2fbd6c46ea9"
+    },
+    {
+      "id": "zygisk_shamiko",
+      "name": "Shamiko",
+      "author": "LSPosed Developers",
+      "description": "これで勝ったと思うなよ―――!!",
+      "version": "v1.2.5 (414)",
+      "versionCode": 414,
+      "stars": 6373,
+      "updatedAt": 1785328745000,
+      "sizeBytes": 6523936,
+      "downloadUrl": "https://github.com/LSPosed/LSPosed.github.io/releases/download/shamiko-414/Shamiko-v1.2.5-414-release.zip",
+      "repoUrl": "https://github.com/LSPosed/LSPosed.github.io",
+      "managers": [
+        "MAGISK",
+        "KERNELSU",
+        "APATCH"
+      ],
+      "lsposed": false,
+      "readme": "LSPosed Official Website\n\nLSPosed\n\nDownload:\n\nChangelog:\n\nBugreport: mail to report@bug.lsposed.org\n\nXposed Module Repository\n\nWebpage:",
+      "changelog": "- Fix compatibility with Frida\n- Force create no_mount_znctl\n- Fix issues under 16K page size"
+    },
+    {
+      "id": "uperf",
+      "name": "Uperf",
+      "author": "Matt Yang",
+      "description": "Userspace performance controller for android. Repo: https://github.com/yc9559/uperf/",
+      "version": "v3(22.09.04)",
+      "versionCode": 220904,
+      "stars": 3408,
+      "updatedAt": 1662284015000,
+      "sizeBytes": 210005,
+      "downloadUrl": "https://github.com/yc9559/uperf/releases/download/v1-20200516/uperf-v1-20200516.zip",
+      "repoUrl": "https://github.com/yc9559/uperf",
+      "managers": [
+        "MAGISK",
+        "KERNELSU",
+        "APATCH"
+      ],
+      "lsposed": false,
+      "readme": "Uperf\n\n一个Android用户态性能控制器，实现大部分内核态升频功能，并支持更多情景识别。\n\n主要功能\n- 根据识别的场景类型，动态设定参数控制性能释放，支持所有sysfs节点\n- 支持动态绑定正在操作的APP的UI相关线程到大核集群\n- 从Linux层面读取Android的触摸屏输入信号，识别点击和滑动\n- 主动采样系统负载，识别例如APP启动的瞬间重负载\n- 监听cpuset分组更新操作，识别正在操作的APP发生切换\n- 监听唤醒锁更新操作，识别屏幕是否熄灭\n- 监听注入到Surfaceflinger的hook发送的通知，识别渲染开始、滞后、结束\n- 支持Android 6.0 - 12\n- 支持arm64-v8a\n- 支持Magisk方式一键安装，版本不低于20.4+\n- 不依赖于Magisk，可以手动方式安装\n- 除非SfAnalysis注入失败，大多数情况SELinux可保持enforcing\n- 不依赖于任何Android应用层框架以及第三方内核\n- 为大多数热门硬件平台提供了调参后的配置文件\n\n下载\n\nhttps://github.com/yc9559/uperf/releases\n\n安装\n\nMagisk方式\n\n1. 下载后通过Magisk Manager刷入，Magisk版本不低于18.0\n2. 重启后查看/sdcard/Android/yc/uperf/uperf_log.txt检查uperf是否正常自启动\n\n手动安装\n\n1. 如果你的设备无法安装Magisk，并且已经获取到ROOT权限\n2. 下载后手动解压缩，例如解压缩到/data/uperf\n3. 修改setup_uperf.sh，run_uperf.sh，initsvc_uperf.sh权限为755\n4. 执行setup_uperf.sh完成安装，检查输出信息是否有报错\n5. 执行run_uperf.sh启动uperf，检查输出信息是否有报错\n6. 打开/data/cache/injector.log，检查sfanalysis注入是否成功\n7. 如果关联自启动到第三方APP，设置在开机完成后执行run_uperf.sh\n8. 如果关联自启动到系统启动脚本，插入sh /data/uperf/initsvc_uperf.sh\n9. 重启后查看/sdcard/yc/uperf/uperf_log.txt检查uperf是否正常自启动\n\n性能模式切换\n\n修改启动时的默认性能模式\n\n1. 打开/sdcard/Android/yc/uperf/cur_powermode.txt\n2. 修改auto, 其中auto为开机后使用的默认性能模式，可选的模式有:\n- auto根据正在使用的App进行动态响应\n- balance均衡模式，比原厂略流畅的同时略省电\n- powersave卡顿模式，保证基本流畅的同时尽可能降低功耗\n- performance费电模式，保证费电的同时多一点流畅度\n- fast性能模式，相对于均衡模式更加激进\n3. 重启\n\n启动完成后切换性能模式\n\n方法1:\n执行sh /data/powercfg.sh balance，其中balance是想要切换到的性能模式名称。\n\n方法2:\n安装Scene为APP绑定对应的性能模式。\n\n常见问题\n\nQ：是否对待机功耗有负面影响？\nA：Uperf的实现做了不少低功耗的优化，自身运行的功耗开销很低。此外预制配置文件的待机模式中，减少了待机时唤醒的核心数量并使用了保守的升频参数。待机功耗的优化主要靠减少唤醒时长比例，在此基础上Uperf可进一步降低一点待机功耗。\n\nQ：为什么使用了Uperf还是很费电？\nA：SOC的AP部分功耗主要取决于计算量以及使用的频点。Uperf只能控制性能释放，改进频点的选择从而降低功耗，如果后台APP的计算量很大是无法得到显著的续航延长的。这一问题可以通过Scene工具箱的进程管理器来定位。\n\nQ：是否需要关闭系统的温度控制？\nA：系统温度控制是一种硬件保护措施，或者用于改善高负载下的用户体验。大多数情况下无需关闭它，如果你遇到性能严重受限的情况，例如运行竞技游戏CPU最大频率限制在1.4Ghz，请提升温控介入的阈值或者关闭系统温度控制。\n\nQ：Uperf和Scene工具箱是什么关系？\nA：这两个软件独立运作，没有互相依赖。Uperf实现了接口可供Scene工具箱调用，例如性能模式切换以及分APP性能模式。如果不安装Scene工具箱也可以实现性能模式切换，详情见使用方式。\n\nQ：是否还需要关闭系统的performance boost？\nA：Uperf模块内脚本已经关闭了大部分主流的用户态和内核态升频，如果有非常规的升频需要用户自己关闭。\n\nQ：我遇到了一些奇怪的系统故障，是怎么回事？\nA：Uperf在大多数平台可以正常工作，在测试阶段收集到了以下可能发生的故障：\n- 桌面启动器不响应触摸。这个目前只在MIUI 12遇到，如果遇到了此问题请删除/data/adb/modules/uperf/enable_sfanalysis\n- 触摸屏报点间断丢失。请检查是否使用了自动跳过之类的APP，特别是支持坐标点击的\n- 睡死。用户态应用程序理论上不会影响系统稳定性，请更换为官方内核和ROM\n\nQ：使用Magisk安装时提示not supported，这是为什么？\nA：此硬件平台没有预制的配置文件，可能需要自行适配。\n\n详细介绍\n\n这是在Project WIPE、Project WIPE v2、Perfd-opt、QTI-mem-opt之后的一个新项目。在之前的工作中，往往是基于一个现有的性能控制器做调参，这也意味着最后究竟能做到多好取决于控制器本身的上限。在EAS调度器成为主流之后无法应用WIPE系列的思路，因为EAS的参数自由度实在太少，等到借助了高通Boost框架才实现了更广范围的调整，才有了Perfd-opt。一方面受制于现有的性能控制器的功能限制，一方面还有一部分老设备没有这些新的性能控制器。没有条件就要创造条件，编写了一个安卓全平台的用户态性能控制器。\n\n用户态性能控制通常有着较高的延迟（因为修改sysfs节点消耗相对较多的时间），但是距离实际应用场景很近可以在一些已知的重负载开始之前主动提升性能减少卡顿。一般的工作模式是在系统框架Java层发送Hint，由Native层的服务接收Hint并执行对应的sysfs修改，例如高通CAF Boost Framework、Power-libperfmgr。\n\n与其他用户态性能控制器不同的是，Uperf没有Java层的部分，只有Native层接收时间通知和主动采样，这也就没有了系统框架层面的依赖。因此她不需要重新编译内核，也不需要修改Android框架源码，她也没有几乎硬件平台的限制。她的修改范围涵盖了所有内核态性能控制能够做到的，也就是说不用换掉没啥bug的官方内核，就能使用输入升频（没错，少部分老内核没有这个）、Dynamic Stune Boost、Devfreq Boost这些花式Boost。\n\n下表为几个主要的性能优化方案的功能对比：\n|          功能          | Project WIPE | Perfd-opt(CAF) | libperfmgr | Uperf |\n| :--------------------: | :----------: | :------------: | :--------: | :---: |\n|    HMP+interactive     |      ✔️       |                |            |   ✔️   |\n|     EAS+schedutil      |              |       ✔️        |     ✔️      |   ✔️   |\n|       非高通平台       |      ✔️       |                |            |   ✔️   |\n|     Android  /path`。\n- percluster，分集群紧凑型写入器。使用配置文件中platform/clusterCpuId的CPU序号替换path中的%d，各个值由逗号分隔，使得按集群做区分的值更加紧凑，改善可读性。\n- percpu，分核心紧凑型写入器。根据配置文件中platform/efficiency的列表长度，生成CPU序号替换path中的%d，各个值由逗号分隔，使得按CPU核心做区分的值更加紧凑，改善可读性。\n- cpufreq，percluster写入器的变种。大部分功能相同，不同的是写入值=设定值*100000，缩短了频率参数序列的长度，以及带有写入失败重试以处理新的最低频率高于原有的最高频率。\n- cgroup_procs，Cgroup专用写入器。支持最大4个值，各个值由逗号分隔，设定值为进程名称，Uperf在初始化时会扫描系统所有进程，用匹配到的第一个PID替换它们。一般用于设置系统关键进程到指定的cgroup。由于一个进程的线程可能会动态变化，因此此类写入器会关闭去重。\n- uxaffinity，UxAffinity写入器。在每次正在操作的APP发生切换时，Uperf都会扫描属于顶层APP的cgroup的所有线程，缓存所有UI相关线程的ID。当设定它为1时，把UI相关线程固定到大核心。当设定它为0时，允许UI相关线程使用全部可用核心。在大多数EAS平台上设置schedtune.boost > 0和schedtune.prefer_idle = 1即可把任务固定到大核，但是EAS在各个平台的具体实现层次不齐，这个参数组不合适用于所有EAS平台。为了解决这一问题，Uperf主动设置这些关键线程的CPU核心亲和性，适用于所有EAS平台，甚至是HMP平台。\n\n预调参\n- Uperf模块为大多数热门硬件平台提供了调参后的配置文件，以尽可能发挥Uperf的优势\n- HMP平台均衡和卡顿版的interactive参数与HMP负载迁移阈值由改进的Project WIPE v2提供，费电模式采用固定在功耗拐点的频点提供最稳定持续的性能\n- EAS平台的频点选择综合了SOC功耗模型和常见负载的性能需求，由一套固定策略生成\n- 三星、sdm845以及移植的EAS平台，由于缺少关键内核功能采用传统的调参方法，即普通场景不提供过高的性能容量\n- sdm845以后的高通EAS平台，采用调整后性能需求-性能容量模型，见下图\n\n假设系统负载只由单个任务贡献。EAS默认的方式由于schedutil总是预留25%性能余量，而SOC的不同频点的能耗比表现不同，越接近最大频率能耗比越低，EAS的默认策略会导致较高负载时最大频率占比偏大。从现实负载变化的规律来看，25%性能余量并不总是够用，负载较低时容易产生大的波动，负载较高时性能需求反而是相对稳定的。从SOC的功耗模型和现实负载变化的规律来看，负载较低时由于波动值的相对百分比较大应该留出更大的性能余量，SOC的低频段一般能耗比差别不大，功耗负面影响不大；负载较高时由于波动值的相对百分比较小应该留出较小的性能余量，SOC的高频段的每个频点之间的能耗比差别比较明显，功耗正面影响较大。\n\n外围改进\n\n本模块除了Uperf本体以及SfAnalysis注入，还配合一些外围的改进共同改进用户体验。\n- Uperf启动前其他参数统一化，包括：\n- schedtune置零\n- 使用CFQ调速器，降低多任务运行时前台任务的IO延迟\n- 降低非前台APP的IO带宽占用权重\n- 设置与UI性能密切相关的系统进程到顶层APP的cgroup分组\n- 固定于过渡动画相关的线程到大核\n- 减少大部分传感器线程在大核的唤醒\n- 禁用大多数内核态和用户态boost、热插拔\n- interactive和schedutil调速器、core_ctl、任务调度器外围参数一致化\n- 为指纹识别提供最大性能(EAS平台)\n\n自定义配置文件\n\n本项目已经为大多数热门硬件平台提供了调参后的Uperf配置文件，但总有一些情况预调参的配置不适用于你的软硬件平台，例如冷门的硬件平台、自定义的内核。此外，也有自定义现有预调参配置文件的需求，例如调高交互时的最低CPU频率、增加GPU频率范围调整。在Uperf设计之初便考虑到了这类需求，开放几乎所有的可调参数，并且在配置文件更改保存后自动重新加载，改善在手机端调试参数的效率。Magisk模块使用的配置文件位于/sdcard/yc/uperf/cfg_uperf.json。\n\n元信息\n\n\"meta\": {\n    \"name\": \"sdm855/sdm855+ v20200516\",\n    \"author\": \"yc@coolapk\",\n    \"features\": \"touch cpuload render standby sfanalysis\"\n}\n\n| 字段名   | 数据类型 | 描述                                           |\n| -------- | -------- | ---------------------------------------------- |\n| name     | string   | 配置文件的名称                                 |\n| author   | string   | 配置文件的作者信息                             |\n| features | string   | 配置文件支持的功能列表，目前是保留字段不起作用 |\n\nname与author在日志以如下方式体现：\n...",
+      "changelog": "支持如下平台：\n- sdm615/616\n- sdm650/652\n- sdm625(HMP/EAS)\n- sdm626(HMP/EAS)\n- sdm660(HMP/EAS)\n- sdm636(HMP/EAS)\n- sdm82x(HMP/EAS)\n- sdm835(HMP/EAS)\n- sdm665\n- sdm675\n- sdm710/712\n- sdm730/730g\n- sdm765/765g\n- sdm768g\n- sdm845\n- sdm855/855+\n- sdm865/865+ lpddr4x/5\n- exynos 7420\n- exynos 8890\n- exynos 8895(HMP/EAS)\n- exynos 9810\n- exynos 9820/9825\n\n项目介绍、使用帮助、自定义配置文件教程：README\n\n下载：\n方法一：点击下方\"Asserts\"中的uperf-v1-20200516.zip开始下载\n方法二：蓝奏云镜像"
+    },
+    {
+      "id": "zygisk-assistant",
+      "name": "Zygisk Assistant",
+      "author": "snake-4",
+      "description": "A Zygisk module to hide root.",
+      "version": "v2.1.4 (1013f8a-debug)",
+      "versionCode": 214,
+      "stars": 2684,
+      "updatedAt": 1777903696000,
+      "sizeBytes": 972488,
+      "downloadUrl": "https://github.com/snake-4/Zygisk-Assistant/releases/download/v2.1.4/Zygisk-Assistant-v2.1.4-1013f8a-debug.zip",
+      "repoUrl": "https://github.com/snake-4/Zygisk-Assistant",
+      "managers": [
+        "MAGISK",
+        "KERNELSU",
+        "APATCH"
+      ],
+      "lsposed": false,
+      "readme": "Zygisk Assistant\n\n    A Zygisk module that aims to hide the existence root and Zygisk.\n\n    Report Bug\n    ·\n    Request Feature\n    ·\n    Latest Release\n\nAbout The Project\n\nUsing the release build is recommended over the debug build. Only use debug builds if you are going to make a bug report.\n\nKernelSU & APatch users:\n1. Install ZygiskNext.\n1. Make sure the option Umount modules/Exclude modifications is enabled for the target app in the KernelSU/APatch Manager.\n1. Disable Enforce DenyList in ZygiskNext settings if there is one.\n\nMagisk users:\n1. Update your Magisk to 27.0 or newer for better hiding capabilities. (optional)\n1. Turn on Zygisk in Magisk settings.\n1. Turn off Enforce DenyList in Magisk settings.\n1. Add the target app to the deny list unless you're using a Magisk fork with a white list instead.\n\nContributing\n\nContributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are greatly appreciated.\n\nIf you have a suggestion that would make this better, please fork the repo and create a pull request. You can also simply open an issue with the tag \"enhancement\".\nDon't forget to give the project a star! Thanks again!\n\n1. Fork the Project\n2. Create your Feature Branch (git checkout -b feature/FeatureName)\n3. Commit your Changes (git commit -m 'Add some FeatureName')\n4. Push to the Branch (git push origin feature/FeatureName)\n5. Open a Pull Request\n\nLicense\n\nDistributed under the MIT License. See LICENSE for more information.",
+      "changelog": "Fixed a problem causing Zygisk Assistant to be detectable.\nUpdated prop scripts.\nCompiled with a newer compiler."
+    },
+    {
+      "id": "busybox-ndk",
+      "name": "Busybox for Android NDK",
+      "author": "osm0sis @ xda-developers",
+      "description": "Static busybox binary for all Android architectures built with the NDK",
+      "version": "1.36.1",
+      "versionCode": 13614,
+      "stars": 1175,
+      "updatedAt": 1786195101000,
+      "sizeBytes": 9918926,
+      "downloadUrl": "https://github.com/Magisk-Modules-Repo/busybox-ndk/releases/download/13614/UPDATE-Busybox.Installer.v1.36.1-ALL-signed.zip",
+      "repoUrl": "https://github.com/Magisk-Modules-Repo/busybox-ndk",
+      "managers": [
+        "MAGISK",
+        "KERNELSU",
+        "APATCH"
+      ],
+      "lsposed": false,
+      "readme": "Busybox for Android NDK\nosm0sis @ xda-developers\n*Static busybox binary for all Android architectures built with the NDK*\n\nLinks\n- GitHub\n- Support\n- Sponsor\n- Donate\n\nDescription\nA byproduct of building my own busybox for my AIK-mobile package.\n\nDetects device (ARM/64, x86/_64, MIPS/64) to install the busybox binary, cleans up symlinks from any previous install and generates new ones. Detects and supports SuperSU/Magisk systemless installs.\n\nMy build configs/patches are available here: android-busybox-ndk\n\nPlease read the release post for info re: applet inclusion, zip renaming options and special features.",
+      "changelog": "- update to xdaforums links"
+    },
+    {
+      "id": "ssh",
+      "name": "SSH for Magisk",
+      "author": "D4rCM4rC and Contributors",
+      "description": "OpenSSH and Rsync bundled with simple start scripts for Android with Magisk",
+      "version": "v0.23",
+      "versionCode": 23,
+      "stars": 247,
+      "updatedAt": 1691227663000,
+      "sizeBytes": 16889953,
+      "downloadUrl": "https://gitlab.com/d4rcm4rc/MagiskSSH_releases/-/raw/main/magisk_ssh_v0.23.zip",
+      "repoUrl": "https://github.com/Magisk-Modules-Repo/ssh",
+      "managers": [
+        "MAGISK",
+        "KERNELSU",
+        "APATCH"
+      ],
+      "lsposed": false,
+      "readme": "MagiskSSH\n=========\n\nThis is an SSH server running as root using the great Magisk systemless root suite. It includes binaries for arm, arm64, x86, x86_64. However, only arm64 has been tested at all. It requires Android API version 24 or higher (Android 7.0 Nougat and higher).\n\nIncluded software\n- OpenSSL 3.1.0 (only needed for its libcrypto)\n- OpenSSH 9.3p2\n- Rsync 3.2.7\n- Magisk Module Installer\n\nInstallation\n\nDownload the zip file and install it via the Magisk Manager app. Once this module is available in the Magisk module repository, you can just install it from there.\n\nConfiguration\n\nSSH keys can be put into /data/ssh/root/.ssh/authorized_keys and /data/ssh/shell/.ssh/authorized_keys using your favorite method of editing files.\nNote that this file must be owned by the respective user and should have 600 permissions (owner: rw, everyone else: nothing).\n\nThe sshd configuration file in /data/ssh/sshd_config can be edited as well, but please be aware that some features usually present in an OpenSSH installation may be missing. Most importantly, password login is not possible using this package.\n\nThe ssh daemon automatically starts on device boot. If this is undesired, you can create a file /data/ssh/no-autostart. It will not start the service then.\n\nUsage\n\nOnce you have written a valid SSH public key into an authorized_keys file (see section 'Configuration' above), you can connect to the device using ssh shell@ (unprivileged access) or ssh root@ (privileged access), while supplying the correct private key. You will drop into a shell on the device. sftp and rsync should work as usual.\n\nIf you want to manually start/stop the sshd-service, you may do so using /data/adb/modules/ssh/opensshd.init start and /data/adb/modules/ssh/opensshd.init stop. This is usually not necessary but may be useful if you use the no-autostart file described earlier.\nNote that the opensshd.init script may be in a different place on your device. Magisk explicitly does not give any guarantees about the install location and is free to change it.\n\nUninstallation\n\nUninstalling the module via the Magisk Manager should also delete the /data/ssh directory.\nThis contains the host keys for the SSH server and the home directories for the SSH users.\nThus, uninstalling via the Manager should get rid of all traces of this module.\n\nIf you wish to keep the runtime data for a later reinstallation of the module, create a file /data/ssh/KEEP_ON_UNINSTALL and the uninstaller will skip this step.\n\nContributing\n\nPlease don't file Pull Requests against the module repository. The module building is an automated process and will overwrite any changes to the files in the module repository.\nFeel free to create a Merge Request against the source repository, instead.\n\nLicense\n\nGPL v3\n\nLinks\n\nSource Code Repository\n\nChangelog\n\n2023-07029, v0.16\n- Adress CVE-2023-38408, even though we don't ship the affected agent.\n- Version bump.\n- OpenSSH 9.3p2\n\n2023-03-26, v0.15\n- Version bump.\n- OpenSSL 3.1.0\n- OpenSSH 9.3p1\n- Rsync 3.2.7\n- Drop mips and mips64 support\n- Build using NDK r25c, simplify building and updating a bit\n- Shrink package (strip binaries, use stronger compression)\n- Add updateJson mechanism for updating on Magisk v24 and later (thanks tamas646)\n\n2022-02-19, v0.14\n- Add uninstaller script (see section 'Uninstallation') (thanks cl-ement05 and osm0sis)\n- Use user handles instead of names for credits (thanks osm0sis)\n- Ensure correct home directory permissions on install (thanks nazar-pc)\n- Put temp files into /data/local/tmp instead of /tmp (thanks F-i-f)\n\n2022-02-19, v0.13\n- Version bump.\n- OpenSSL 3.0.1\n- OpenSSH 8.8p1\n- Magisk installer v24.1\n\n2021-04-30, v0.12\n- Version bump.\n- OpenSSL 1.1.1k\n- OpenSSH 8.6p1\n- Rsync 3.2.3\n- Magisk installer v22.1\n- Fix build repository's commit hash bleeding into rsync --version\n- Properly set library path for rsync (thanks adorkablue)\n\n2020-07-18, v0.11\n- Version bump.\n- OpenSSL 1.1.1g\n- OpenSSH 8.3p1\n- Rsync 3.2.2\n- Magisk installer v20.4\n\n2019-11-26, v0.10\n- Version bump.\n- OpenSSL 1.0.2t\n- OpenSSH 8.1p1\n- Magisk installer v20.1\n\n2019-04-06, v0.9\n- Remove downloading Magisk template, directly include the installer structure instead\n\n2019-03-23, v0.8\n- Bugfix.\n- Correctly apply permissions to bin/raw files\n\n2019-03-16, v0.7\n- Bugfixes.\n- Avoid hardcoding MODDIR in opensshd.init\n- Use wrapper script for setting LD_LIBRARY_PATH instead of setting it in init script\n\n2019-03-10, v0.6\n- Version bump.\n- OpenSSL 1.0.2r\n\n2018-11-04, v0.5\n- Version bumps (except rsync).\n- Set owner and permissions for shell directory\n- OpenSSL 1.0.2p\n- OpenSSH 7.9p1\n- Magisk Module Template v17000\n\n2018-07-16, v0.4\n- Derive paths from $MODDIR instead of hardcoding /magisk\n\n2018-04-06, v0.3\n- Version bumps.\n- Fix sftp rename on filesystems without hardlinks (ie. FAT32)\n- OpenSSL 1.0.2o\n- OpenSSH 7.7p1\n- Rsync 3.1.3\n- Magisk Module Template v1500\n\n2017-11-23, v0.2\n- Version bumps.\n- OpenSSL 1.0.2m\n- OpenSSH 7.6p1\n- Rsync 3.1.2\n- Magisk Module Template v1400\n\n2017-10-03, v0.1\n- Initial release.\n- OpenSSL 1.0.2l\n- OpenSSH 7.5p1\n- Rsync 3.1.2\n- Magisk Module Template v1400",
+      "changelog": ""
+    }
+  ]
+}

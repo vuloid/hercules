@@ -8,7 +8,7 @@ on:
       max_repos:
         description: Maximum repositories to inspect
         required: false
-        default: "150"
+        default: "2500"
   push:
     paths:
       - "indexer/**"
@@ -38,11 +38,11 @@ jobs:
 
       - name: Build catalog
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.CATALOG_TOKEN || secrets.GITHUB_TOKEN }}
         run: >-
           python indexer/build_catalog.py
           --out catalog/modules.json
-          --max-repos ${{ github.event.inputs.max_repos || '150' }}
+          --max-repos ${{ github.event.inputs.max_repos || '2500' }}
 
       - name: Validate catalog
         run: python indexer/build_catalog.py --validate-only catalog/modules.json

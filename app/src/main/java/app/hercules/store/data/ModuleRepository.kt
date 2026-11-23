@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import java.io.File
 import java.util.zip.ZipFile
 
@@ -28,16 +30,38 @@ class ModuleRepository(
     private val _catalog = MutableStateFlow(CatalogState(loading = true))
     val catalog: StateFlow<CatalogState> = _catalog.asStateFlow()
 
+    private val json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+    }
+
     suspend fun refresh() {
         _catalog.update { it.copy(loading = true, error = null) }
         try {
-            val modules = if (catalogUrl.isBlank()) MockModules.all() else api.fetchCatalog(catalogUrl)
+            val modules = if (catalogUrl.isBlank()) {
+                loadBundledCatalog() ?: MockModules.all()
+            } else {
+                api.fetchCatalog(catalogUrl)
+            }
             _catalog.value = CatalogState(modules = modules)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            _catalog.update { it.copy(loading = false, error = e.message ?: e.javaClass.simpleName) }
+            val bundled = loadBundledCatalog()
+            if (bundled != null) {
+                _catalog.value = CatalogState(modules = bundled)
+            } else {
+                _catalog.update { it.copy(loading = false, error = e.message ?: e.javaClass.simpleName) }
+            }
         }
+    }
+
+    private suspend fun loadBundledCatalog(): List<ModuleItem>? = withContext(Dispatchers.IO) {
+        runCatching {
+            val stream = javaClass.classLoader?.getResourceAsStream("modules.json") ?: return@runCatching null
+            val raw = stream.bufferedReader().use { it.readText() }
+            json.decodeFromString<BundledCatalog>(raw).modules
+        }.getOrNull()
     }
 
     suspend fun lookupGithub(owner: String, repo: String): ModuleItem = api.fetchGithubModule(owner, repo)
@@ -76,6 +100,9 @@ class ModuleRepository(
         (!name.contains('/') && name.endsWith(".sh")) || name == UPDATE_BINARY
 
     private fun safe(value: String): String = value.replace(UNSAFE, "_")
+
+    @Serializable
+    private data class BundledCatalog(val modules: List<ModuleItem> = emptyList())
 
     private companion object {
         val UNSAFE = Regex("[^A-Za-z0-9._-]")

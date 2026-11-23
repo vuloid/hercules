@@ -1,8 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Hercules</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_glass">Liquid Glass (iOS 26)</string>
+    <string name="settings_glass_subtitle">Live backdrop blur and specular edge</string>
+    <string name="settings_refresh_catalog">Refresh catalog</string>
+    <string name="settings_clear_cache">Clear download cache</string>
 
-    <string name="tab_catalog">Catalog</string>
+    <string name="tab_catalog">Browse</string>
+    <string name="tab_featured">Featured</string>
     <string name="tab_installed">Installed</string>
 
     <string name="search_hint">Search modules or paste a GitHub URL</string>
@@ -23,16 +29,22 @@
     <string name="github_resolving">Resolving repository</string>
     <string name="github_failed">Could not read repository: %1$s</string>
 
-    <string name="action_install">Install</string>
-    <string name="action_update">Update</string>
+    <string name="action_install">INSTALL</string>
+    <string name="action_update">UPDATE</string>
+    <string name="action_installed">INSTALLED</string>
+    <string name="action_get">GET</string>
     <string name="action_retry">Retry</string>
     <string name="action_refresh">Refresh</string>
+    <string name="action_see_all">See All</string>
     <string name="action_reboot">Reboot</string>
     <string name="action_close">Close</string>
     <string name="action_download_zip">Download ZIP</string>
     <string name="action_download_apk">Download APK</string>
     <string name="action_inspect_scripts">Inspect Scripts</string>
     <string name="action_hide_scripts">Hide Scripts</string>
+    <string name="action_flash_local">Flash local ZIP</string>
+    <string name="flash_invalid_zip">Only .zip module files can be flashed</string>
+    <string name="flash_copy_failed">Could not read the selected file</string>
 
     <string name="label_file_size">File size</string>
     <string name="label_source">Source</string>
@@ -69,7 +81,9 @@
     <string name="log_no_root">No supported root manager found, or root access was denied</string>
     <string name="log_manager_mismatch">This package does not list %1$s as supported</string>
     <string name="log_installing_with">Installing with %1$s</string>
+    <string name="log_installing_apk">Installing APK with pm</string>
     <string name="log_success">Installation finished. Reboot to apply.</string>
+    <string name="log_success_apk">APK installed. Enable it in your Xposed manager.</string>
     <string name="log_exit_code">Installer exited with code %1$s</string>
 
     <string name="installed_title">Installed</string>
@@ -78,4 +92,22 @@
     <string name="installed_empty">No modules found in /data/adb/modules</string>
     <string name="installed_no_root">Root access is required to list installed modules</string>
     <string name="badge_disabled">disabled</string>
+
+    <string name="spotlight_label">SPOTLIGHT</string>
+    <string name="section_spotlight">Spotlight</string>
+    <string name="featured_intro">Handpicked packages and recent releases</string>
+    <string name="section_categories">Categories</string>
+    <string name="section_recently_updated">Recently Updated</string>
+    <string name="section_collections">Collections</string>
+    <string name="section_modules">Modules (%1$d)</string>
+    <string name="stack_play_integrity">Play Integrity</string>
+    <string name="stack_lsposed">LSPosed Picks</string>
+    <string name="stack_audio">Audio &amp; Sound</string>
+    <string name="stack_battery">Battery &amp; Kernel</string>
+    <string name="stack_system">System &amp; UI</string>
+
+    <string name="status_checking">Checking</string>
+    <string name="status_no_root">No Root</string>
+    <string name="status_root_generic">Root</string>
+    <string name="status_active">%1$s • %2$d active</string>
 </resources>

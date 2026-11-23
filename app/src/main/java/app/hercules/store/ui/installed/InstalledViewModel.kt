@@ -2,16 +2,15 @@ package app.hercules.store.ui.installed
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.hercules.store.data.InstalledStore
 import app.hercules.store.data.ModuleRepository
+import app.hercules.store.data.findForInstalled
 import app.hercules.store.data.model.InstalledModule
 import app.hercules.store.data.model.ModuleItem
-import app.hercules.store.root.RootExecutor
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class InstalledEntry(val module: InstalledModule, val update: ModuleItem?)
@@ -23,24 +22,16 @@ data class InstalledUiState(
     val rootAvailable: Boolean? = null
 )
 
-private data class InstalledLoad(
-    val modules: List<InstalledModule> = emptyList(),
-    val loading: Boolean = false,
-    val rootAvailable: Boolean? = null
-)
-
 class InstalledViewModel(
     repository: ModuleRepository,
-    private val root: RootExecutor
+    private val store: InstalledStore
 ) : ViewModel() {
-    private val installed = MutableStateFlow(InstalledLoad())
-
     val state: StateFlow<InstalledUiState> =
-        combine(installed, repository.catalog) { load, catalog ->
-            val entries = load.modules.map { module ->
+        combine(store.state, repository.catalog) { load, catalog ->
+            val entries = load.withPackages(catalog.modules).map { module ->
                 InstalledEntry(
                     module = module,
-                    update = catalog.modules.firstOrNull { it.id == module.id && it.versionCode > module.versionCode }
+                    update = catalog.modules.findForInstalled(module.id)?.takeIf { it.versionCode > module.versionCode }
                 )
             }
             InstalledUiState(
@@ -52,12 +43,6 @@ class InstalledViewModel(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), InstalledUiState())
 
     fun refresh() {
-        if (installed.value.loading) return
-        installed.update { it.copy(loading = true) }
-        viewModelScope.launch {
-            val available = root.isRootAvailable()
-            val modules = if (available) root.listInstalledModules() else emptyList()
-            installed.value = InstalledLoad(modules, loading = false, rootAvailable = available)
-        }
+        viewModelScope.launch { store.refresh() }
     }
 }

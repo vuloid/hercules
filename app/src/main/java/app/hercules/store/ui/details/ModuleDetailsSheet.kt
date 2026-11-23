@@ -52,12 +52,17 @@ import app.hercules.store.data.model.ScriptFile
 import app.hercules.store.data.model.ScriptReport
 import app.hercules.store.data.model.Severity
 import app.hercules.store.ui.HerculesViewModelFactory
+import app.hercules.store.data.InstallStatus
 import app.hercules.store.ui.components.AccentButton
 import app.hercules.store.ui.components.HerculesShapes
 import app.hercules.store.ui.components.ModuleBadges
 import app.hercules.store.ui.components.QuietButton
+import app.hercules.store.ui.components.InstalledPill
 import app.hercules.store.ui.components.formatSize
 import app.hercules.store.ui.theme.HerculesMono
+import app.hercules.store.ui.components.glassSurface
+import dev.chrisbanes.haze.HazeState
+import androidx.compose.foundation.shape.RoundedCornerShape
 
 private const val PREVIEW_LINES = 80
 
@@ -65,8 +70,11 @@ private const val PREVIEW_LINES = 80
 @Composable
 fun ModuleDetailsSheet(
     module: ModuleItem,
+    status: InstallStatus,
     onDismiss: () -> Unit,
     onInstall: () -> Unit,
+    hazeState: HazeState? = null,
+    liquidGlassEnabled: Boolean = true,
     viewModel: DetailsViewModel = viewModel(key = module.id, factory = HerculesViewModelFactory)
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -79,15 +87,16 @@ fun ModuleDetailsSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = scheme.surfaceContainer
+        containerColor = Color.Transparent
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .glassSurface(hazeState, liquidGlassEnabled, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
                 .navigationBarsPadding()
-                .padding(bottom = 16.dp),
+                .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Column {
@@ -105,26 +114,34 @@ fun ModuleDetailsSheet(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                AccentButton(
-                    text = stringResource(R.string.action_install),
-                    onClick = onInstall,
-                    enabled = hasDownload
-                )
+                if (status == InstallStatus.INSTALLED) {
+                    InstalledPill(stringResource(R.string.action_installed))
+                } else {
+                    AccentButton(
+                        text = stringResource(
+                            if (status == InstallStatus.UPDATE_AVAILABLE) R.string.action_update else R.string.action_install
+                        ),
+                        onClick = onInstall,
+                        enabled = hasDownload
+                    )
+                }
                 QuietButton(
                     text = stringResource(if (module.isApk) R.string.action_download_apk else R.string.action_download_zip),
                     onClick = { uriHandler.openUri(module.downloadUrl) },
                     enabled = hasDownload,
                     icon = Icons.Rounded.Download
                 )
-                QuietButton(
-                    text = stringResource(if (showScripts) R.string.action_hide_scripts else R.string.action_inspect_scripts),
-                    onClick = {
-                        showScripts = !showScripts
-                        if (showScripts) viewModel.inspect(module)
-                    },
-                    enabled = hasDownload || module.scripts.isNotEmpty(),
-                    icon = Icons.Rounded.Security
-                )
+                if (!module.isApk) {
+                    QuietButton(
+                        text = stringResource(if (showScripts) R.string.action_hide_scripts else R.string.action_inspect_scripts),
+                        onClick = {
+                            showScripts = !showScripts
+                            if (showScripts) viewModel.inspect(module)
+                        },
+                        enabled = hasDownload || module.scripts.isNotEmpty(),
+                        icon = Icons.Rounded.Security
+                    )
+                }
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -164,8 +181,8 @@ fun ModuleDetailsSheet(
                 }
             }
 
-            val description = module.readme.ifBlank { module.description }
-            if (description.isNotBlank()) {
+            val description = module.readme.ifBlank { module.distinctDescription }
+            if (description.isNotBlank() && !description.trim().equals(module.name.trim(), ignoreCase = true)) {
                 Section(stringResource(R.string.section_description)) {
                     Text(description, style = MaterialTheme.typography.bodyMedium)
                 }
@@ -175,7 +192,7 @@ fun ModuleDetailsSheet(
                     Text(module.changelog, style = HerculesMono.body)
                 }
             }
-            if (showScripts) {
+            if (showScripts && !module.isApk) {
                 Section(stringResource(R.string.section_scripts)) {
                     ScriptsContent(scripts)
                 }

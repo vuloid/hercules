@@ -1,6 +1,7 @@
 package app.hercules.store
 
 import android.app.Application
+import app.hercules.store.data.InstalledStore
 import app.hercules.store.data.ModuleRepository
 import app.hercules.store.data.remote.ModuleApi
 import app.hercules.store.root.RootExecutor
@@ -15,6 +16,8 @@ class AppContainer(application: Application) {
         .build()
 
     val rootExecutor = RootExecutor()
+
+    val installedStore = InstalledStore(rootExecutor)
 
     val repository = ModuleRepository(
         api = ModuleApi(client),

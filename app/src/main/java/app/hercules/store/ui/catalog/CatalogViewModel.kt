@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.hercules.store.R
 import app.hercules.store.data.GithubUrl
+import app.hercules.store.data.InstalledSnapshot
+import app.hercules.store.data.InstalledStore
 import app.hercules.store.data.ModuleRepository
 import app.hercules.store.data.model.ModuleItem
 import app.hercules.store.data.model.RootManager
@@ -56,24 +58,32 @@ data class CatalogUiState(
     val loading: Boolean = false,
     val error: String? = null,
     val lookup: GithubLookup = GithubLookup.Idle,
-    val selected: ModuleItem? = null
+    val selected: ModuleItem? = null,
+    val installed: InstalledSnapshot = InstalledSnapshot(),
+    val stack: CuratedStack? = null,
+    val featured: List<ModuleItem> = emptyList(),
+    val recentlyUpdated: List<ModuleItem> = emptyList()
 )
 
 private data class Filters(
     val query: String = "",
     val root: RootFilter = RootFilter.ALL,
     val sort: SortOrder = SortOrder.RECENT,
-    val hideOutdated: Boolean = false
+    val hideOutdated: Boolean = false,
+    val stack: CuratedStack? = null
 )
 
-class CatalogViewModel(private val repository: ModuleRepository) : ViewModel() {
+class CatalogViewModel(
+    private val repository: ModuleRepository,
+    private val installedStore: InstalledStore
+) : ViewModel() {
     private val filters = MutableStateFlow(Filters())
     private val lookup = MutableStateFlow<GithubLookup>(GithubLookup.Idle)
     private val selected = MutableStateFlow<ModuleItem?>(null)
     private var lookupJob: Job? = null
 
     val state: StateFlow<CatalogUiState> =
-        combine(repository.catalog, filters, lookup, selected) { catalog, f, l, s ->
+        combine(repository.catalog, filters, lookup, selected, installedStore.state) { catalog, f, l, s, installed ->
             CatalogUiState(
                 query = f.query,
                 rootFilter = f.root,
@@ -83,7 +93,11 @@ class CatalogViewModel(private val repository: ModuleRepository) : ViewModel() {
                 loading = catalog.loading,
                 error = catalog.error,
                 lookup = l,
-                selected = s
+                selected = s,
+                installed = installed,
+                stack = f.stack,
+                featured = pickFeatured(catalog.modules),
+                recentlyUpdated = catalog.modules.sortedByDescending { it.updatedAt }.take(8)
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CatalogUiState(loading = true))
 
@@ -93,6 +107,10 @@ class CatalogViewModel(private val repository: ModuleRepository) : ViewModel() {
 
     fun refresh() {
         viewModelScope.launch { repository.refresh() }
+    }
+
+    fun refreshInstalled() {
+        viewModelScope.launch { installedStore.refresh() }
     }
 
     fun onQueryChange(value: String) {
@@ -121,6 +139,10 @@ class CatalogViewModel(private val repository: ModuleRepository) : ViewModel() {
 
     fun onHideOutdated(value: Boolean) = filters.update { it.copy(hideOutdated = value) }
 
+    fun onStack(value: CuratedStack) = filters.update {
+        it.copy(stack = if (it.stack == value) null else value)
+    }
+
     fun select(module: ModuleItem?) {
         selected.value = module
     }
@@ -128,9 +150,11 @@ class CatalogViewModel(private val repository: ModuleRepository) : ViewModel() {
     private fun applyFilters(modules: List<ModuleItem>, f: Filters): List<ModuleItem> {
         val query = f.query.trim()
         val isUrl = GithubUrl.parse(query) != null
+        val stack = f.stack.takeIf { query.isEmpty() }
         val cutoff = System.currentTimeMillis() - OUTDATED_MS
         val filtered = modules.filter { module ->
             f.root.matches(module) &&
+                (stack?.matches(module) ?: true) &&
                 (!f.hideOutdated || module.updatedAt >= cutoff) &&
                 when {
                     query.isEmpty() -> true
@@ -140,9 +164,10 @@ class CatalogViewModel(private val repository: ModuleRepository) : ViewModel() {
                         module.description.contains(query, ignoreCase = true)
                 }
         }
-        return when (f.sort) {
-            SortOrder.RECENT -> filtered.sortedByDescending { it.updatedAt }
-            SortOrder.STARS -> filtered.sortedByDescending { it.stars }
+        return when {
+            stack?.ranksByStars == true -> filtered.sortedByDescending { it.stars }
+            f.sort == SortOrder.RECENT -> filtered.sortedByDescending { it.updatedAt }
+            else -> filtered.sortedByDescending { it.stars }
         }
     }
 

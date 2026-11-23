@@ -38,6 +38,7 @@ import app.hercules.store.ui.components.AccentButton
 import app.hercules.store.ui.components.HerculesCard
 import app.hercules.store.ui.components.MonoBadge
 import app.hercules.store.ui.components.SectionHeader
+import app.hercules.store.ui.components.systemNavigationBottomInset
 
 @Composable
 fun InstalledScreen(
@@ -84,7 +85,7 @@ fun InstalledScreen(
             }
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                contentPadding = PaddingValues(start = 12.dp, top = 8.dp, end = 12.dp, bottom = 12.dp + systemNavigationBottomInset()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 if (state.updates.isNotEmpty()) {
@@ -144,9 +145,9 @@ private fun InstalledCard(entry: InstalledEntry, onUpdate: (ModuleItem) -> Unit)
                 )
             }
         }
-        if (module.description.isNotBlank()) {
+        if (module.distinctDescription.isNotBlank()) {
             Text(
-                text = module.description,
+                text = module.distinctDescription,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
@@ -158,7 +159,9 @@ private fun InstalledCard(entry: InstalledEntry, onUpdate: (ModuleItem) -> Unit)
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             MonoBadge(module.id)
-            MonoBadge("${module.version} (${module.versionCode})")
+            MonoBadge(
+                if (module.version.isBlank()) module.versionCode.toString() else "${module.version} (${module.versionCode})"
+            )
             if (update != null) {
                 MonoBadge("${update.version} (${update.versionCode})", icon = Icons.Rounded.Update, accent = true)
             }

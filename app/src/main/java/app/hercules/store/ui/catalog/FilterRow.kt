@@ -19,6 +19,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.hercules.store.R
 import app.hercules.store.ui.components.HerculesShapes
+import app.hercules.store.ui.theme.SileoAccent
 
 @Composable
 fun FilterRow(
@@ -30,10 +31,11 @@ fun FilterRow(
     onHideOutdated: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val scheme = MaterialTheme.colorScheme
     Row(
         modifier = modifier
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp),
+            .padding(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -60,16 +62,16 @@ private fun HerculesChip(label: String, selected: Boolean, onClick: () -> Unit) 
         label = { Text(label, style = MaterialTheme.typography.labelMedium) },
         shape = HerculesShapes.Control,
         colors = FilterChipDefaults.filterChipColors(
-            containerColor = scheme.surfaceContainer,
+            containerColor = scheme.background,
             labelColor = scheme.onSurfaceVariant,
-            selectedContainerColor = scheme.primary,
-            selectedLabelColor = scheme.onPrimary
+            selectedContainerColor = SileoAccent,
+            selectedLabelColor = Color.White
         ),
         border = FilterChipDefaults.filterChipBorder(
             enabled = true,
             selected = selected,
-            borderColor = scheme.outlineVariant.copy(alpha = 0.3f),
-            selectedBorderColor = Color.Transparent
+            borderColor = scheme.outlineVariant,
+            selectedBorderColor = SileoAccent
         )
     )
 }

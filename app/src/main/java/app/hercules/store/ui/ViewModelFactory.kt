@@ -10,12 +10,14 @@ import app.hercules.store.ui.catalog.CatalogViewModel
 import app.hercules.store.ui.details.DetailsViewModel
 import app.hercules.store.ui.install.InstallViewModel
 import app.hercules.store.ui.installed.InstalledViewModel
+import app.hercules.store.ui.status.RootStatusViewModel
 
 val HerculesViewModelFactory: ViewModelProvider.Factory = viewModelFactory {
-    initializer { CatalogViewModel(container().repository) }
+    initializer { CatalogViewModel(container().repository, container().installedStore) }
     initializer { DetailsViewModel(container().repository) }
-    initializer { InstalledViewModel(container().repository, container().rootExecutor) }
-    initializer { InstallViewModel(container().repository, container().rootExecutor) }
+    initializer { InstalledViewModel(container().repository, container().installedStore) }
+    initializer { RootStatusViewModel(container().installedStore) }
+    initializer { InstallViewModel(container().repository, container().rootExecutor, container().installedStore) }
 }
 
 private fun CreationExtras.container(): AppContainer =

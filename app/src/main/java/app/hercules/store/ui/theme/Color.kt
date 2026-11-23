@@ -3,30 +3,36 @@ package app.hercules.store.ui.theme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.graphics.Color
 
+val StatusOnline = Color(0xFF10B981)
+val Obsidian = Color(0xFF090A0F)
+val CharcoalSlate = Color(0xFF13161F)
+val SileoAccent = Color(0xFF14B8A6)
+val IconTileSurface = Color(0xFF181B24)
+
 val GraphiteColorScheme = darkColorScheme(
-    primary = Color(0xFF6AA6FF),
-    onPrimary = Color(0xFF07131F),
-    primaryContainer = Color(0xFF1E3A5F),
-    onPrimaryContainer = Color(0xFFD6E6FF),
-    secondary = Color(0xFF9BA3B1),
-    onSecondary = Color(0xFF0F1115),
-    secondaryContainer = Color(0xFF222733),
+    primary = Color(0xFF3B82F6),
+    onPrimary = Obsidian,
+    primaryContainer = Color(0xFF17243A),
+    onPrimaryContainer = Color(0xFFE7EEFF),
+    secondary = Color(0xFFA3ACBC),
+    onSecondary = Obsidian,
+    secondaryContainer = CharcoalSlate,
     onSecondaryContainer = Color(0xFFE4E6EB),
     tertiary = Color(0xFFE3B341),
     onTertiary = Color(0xFF1A1300),
-    background = Color(0xFF0F1115),
+    background = Obsidian,
     onBackground = Color(0xFFE4E6EB),
-    surface = Color(0xFF0F1115),
+    surface = Obsidian,
     onSurface = Color(0xFFE4E6EB),
-    surfaceVariant = Color(0xFF1A1E27),
+    surfaceVariant = CharcoalSlate,
     onSurfaceVariant = Color(0xFF9BA3B1),
-    surfaceContainerLowest = Color(0xFF0B0D11),
-    surfaceContainerLow = Color(0xFF12151B),
-    surfaceContainer = Color(0xFF151921),
-    surfaceContainerHigh = Color(0xFF1B2029),
-    surfaceContainerHighest = Color(0xFF222733),
+    surfaceContainerLowest = Color(0xFF0D0F15),
+    surfaceContainerLow = Color(0xFF10131A),
+    surfaceContainer = CharcoalSlate,
+    surfaceContainerHigh = Color(0xFF1A1E29),
+    surfaceContainerHighest = Color(0xFF222836),
     outline = Color(0xFF4A5160),
-    outlineVariant = Color(0xFF2B313D),
+    outlineVariant = Color(0xFF303746),
     error = Color(0xFFFF8A80),
     onError = Color(0xFF2A0705)
 )

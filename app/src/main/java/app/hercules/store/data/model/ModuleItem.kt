@@ -34,6 +34,9 @@ data class ModuleItem(
 ) {
     val isApk: Boolean
         get() = downloadUrl.substringBefore('?').endsWith(".apk", ignoreCase = true)
+
+    val distinctDescription: String
+        get() = if (description.trim().equals(name.trim(), ignoreCase = true)) "" else description
 }
 
 @Serializable
@@ -53,7 +56,10 @@ data class InstalledModule(
     val author: String,
     val description: String,
     val enabled: Boolean
-)
+) {
+    val distinctDescription: String
+        get() = if (description.trim().equals(name.trim(), ignoreCase = true)) "" else description
+}
 
 sealed interface DownloadState {
     data class Progress(val bytes: Long, val total: Long) : DownloadState

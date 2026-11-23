@@ -4,12 +4,14 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.hercules.store.R
+import app.hercules.store.data.InstalledStore
 import app.hercules.store.data.ModuleRepository
 import app.hercules.store.data.model.DownloadState
 import app.hercules.store.data.model.ModuleItem
 import app.hercules.store.root.RootExecutor
 import app.hercules.store.root.ShellEvent
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,7 +43,8 @@ data class InstallUiState(
 
 class InstallViewModel(
     private val repository: ModuleRepository,
-    private val root: RootExecutor
+    private val root: RootExecutor,
+    private val installedStore: InstalledStore
 ) : ViewModel() {
     private val _state = MutableStateFlow<InstallUiState?>(null)
     val state: StateFlow<InstallUiState?> = _state.asStateFlow()
@@ -51,6 +54,22 @@ class InstallViewModel(
         if (job?.isActive == true) return
         _state.value = InstallUiState(module)
         job = viewModelScope.launch { run(module) }
+    }
+
+    fun installLocal(file: File) {
+        if (job?.isActive == true) return
+        val module = ModuleItem(
+            id = file.nameWithoutExtension,
+            name = file.name,
+            author = "",
+            description = "",
+            version = "",
+            versionCode = 0,
+            updatedAt = 0L,
+            downloadUrl = ""
+        )
+        _state.value = InstallUiState(module, phase = InstallPhase.INSTALLING)
+        job = viewModelScope.launch { flash(module, file) }
     }
 
     fun dismiss() {
@@ -66,7 +85,20 @@ class InstallViewModel(
         log(LogEntry.System(R.string.log_downloading, listOf(module.name)))
         val file = download(module) ?: return
         log(LogEntry.System(R.string.log_downloaded))
+        flash(module, file)
+    }
 
+    private suspend fun flash(module: ModuleItem, file: File) {
+        if (module.isApk) {
+            if (!root.isRootAvailable()) {
+                fail(LogEntry.System(R.string.log_no_root))
+                return
+            }
+            _state.update { it?.copy(phase = InstallPhase.INSTALLING, progress = null) }
+            log(LogEntry.System(R.string.log_installing_apk))
+            streamInstall(root.installApk(file), R.string.log_success_apk)
+            return
+        }
         val manager = root.detectManager()
         if (manager == null) {
             fail(LogEntry.System(R.string.log_no_root))
@@ -75,12 +107,14 @@ class InstallViewModel(
         if (module.managers.isNotEmpty() && manager !in module.managers) {
             log(LogEntry.System(R.string.log_manager_mismatch, listOf(manager.displayName)))
         }
-
         _state.update { it?.copy(phase = InstallPhase.INSTALLING, progress = null) }
         log(LogEntry.System(R.string.log_installing_with, listOf(manager.displayName)))
+        streamInstall(root.installModule(manager, file), R.string.log_success)
+    }
 
+    private suspend fun streamInstall(events: Flow<ShellEvent>, @StringRes successLog: Int) {
         var exitCode = -1
-        root.installModule(manager, file).collect { event ->
+        events.collect { event ->
             when (event) {
                 is ShellEvent.Line -> log(LogEntry.Shell(event.text, event.isError))
                 is ShellEvent.Exit -> exitCode = event.code
@@ -88,7 +122,8 @@ class InstallViewModel(
         }
         if (exitCode == 0) {
             _state.update { s -> s?.copy(phase = InstallPhase.SUCCESS, progress = null) }
-            log(LogEntry.System(R.string.log_success))
+            log(LogEntry.System(successLog))
+            viewModelScope.launch { installedStore.refresh() }
         } else {
             fail(LogEntry.System(R.string.log_exit_code, listOf(exitCode.toString())))
         }

@@ -30,6 +30,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.hercules.store.R
@@ -53,6 +55,13 @@ fun ConsoleSheet(
     )
     val listState = rememberLazyListState()
     val scheme = MaterialTheme.colorScheme
+    val haptic = LocalHapticFeedback.current
+
+    LaunchedEffect(state.phase) {
+        if (state.phase == InstallPhase.SUCCESS || state.phase == InstallPhase.FAILED) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        }
+    }
 
     LaunchedEffect(state.log.size) {
         if (state.log.isNotEmpty()) listState.scrollToItem(state.log.lastIndex)
@@ -114,7 +123,7 @@ fun ConsoleSheet(
 
             if (!state.running) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (state.phase == InstallPhase.SUCCESS) {
+                    if (state.phase == InstallPhase.SUCCESS && !state.module.isApk) {
                         AccentButton(
                             text = stringResource(R.string.action_reboot),
                             onClick = onReboot,

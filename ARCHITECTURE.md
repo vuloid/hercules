@@ -1,76 +1,70 @@
-# Hercules architecture
+# Architecture
 
-Root module store for Android. Kotlin, Jetpack Compose (Material 3), MVVM, single activity. No GMS, Firebase, analytics, ads or network fonts.
+Hercules 1.0.0 is a single-activity Android app built with Kotlin, Jetpack Compose, and Material 3. It targets Android 8.0 (API 26) and uses the checked-in Gradle wrapper, bundled Inter and JetBrains Mono fonts, and a bundled catalog for offline fallback.
 
-## Setup
+## Project structure
 
-- Put `inter_regular.ttf`, `inter_semibold.ttf` and `jetbrains_mono.ttf` in `app/src/main/res/font/`. The build fails without them.
-- Generate the wrapper once: `gradle wrapper --gradle-version 8.9`.
-- Remote catalog: set `CATALOG_URL` in `app/build.gradle.kts` (`buildConfigField`). Blank means the built-in sample data in `MockModules`.
-
-## Layout
-
-```
-app/src/main/java/app/hercules/store
-  HerculesApp.kt            Application, AppContainer (manual DI: OkHttp, ModuleRepository, RootExecutor)
-  MainActivity.kt           Single activity, edge-to-edge, HerculesTheme { HerculesRoot() }
+```text
+app/src/main/java/app/hercules/store/
+  HerculesApp.kt                 Application and AppContainer
+  MainActivity.kt                Edge-to-edge Compose activity
   data/
-    ModuleRepository.kt     Catalog StateFlow, download Flow, script inspection
-    MockModules.kt          Sample catalog (illustrative, not live data)
-    ScriptAnalyzer.kt       Regex rules over install/service scripts
-    GithubUrl.kt            https://github.com/owner/repo parser
-    model/ModuleItem.kt     ModuleItem, CatalogState, InstalledModule, DownloadState, ScriptReport
-    remote/ModuleApi.kt     OkHttp + kotlinx.serialization: catalog JSON, GitHub API, file download
-  root/
-    RootExecutor.kt         su runner, manager detection, installer commands, module.prop parser
+    ModuleRepository.kt           Catalog, downloads, and script inspection
+    InstalledStore.kt             Installed modules and package state
+    MockModules.kt                Last-resort sample data
+    ScriptAnalyzer.kt             Installer-script checks
+    GithubUrl.kt                  GitHub repository URL parser
+    model/ModuleItem.kt           Catalog, install, and report models
+    remote/ModuleApi.kt           Catalog, GitHub, and download requests
+  root/RootExecutor.kt            su commands and root-manager integration
   ui/
-    HerculesRoot.kt         Scaffold, bottom navigation, NavHost, console sheet host
-    ViewModelFactory.kt     Single factory wired to AppContainer
-    theme/                  Color (graphite fallback), Type (Inter, JetBrains Mono), Theme (dynamic color on 12+)
-    components/             HerculesCard, MonoBadge, buttons, formatters
-    catalog/                CatalogViewModel, CatalogScreen, FilterRow, ModuleCard
-    details/                DetailsViewModel, ModuleDetailsSheet (info, changelog, Inspect Scripts)
-    install/                InstallViewModel (activity scoped), ConsoleSheet (live log, Reboot)
-    installed/              InstalledViewModel, InstalledScreen (versionCode comparison)
+    HerculesRoot.kt               Shared state, three tabs, settings, and sheet hosts
+    ViewModelFactory.kt           AppContainer-backed view model factory
+    catalog/                      Featured, Browse, filters, rows, and domain icons
+    components/                   Glass surfaces, buttons, badges, and insets
+    details/                      Module details and script reports
+    install/                      Download/install state, console, and local ZIP staging
+    installed/                    Installed-module list and update comparison
+    status/                       Root manager status pill
+    theme/                        Material color schemes and typography
+app/src/main/res/font/            Inter and JetBrains Mono font files
+app/src/main/resources/modules.json  Bundled catalog fallback
+gradle/wrapper/                   Checked-in Gradle wrapper
 ```
 
-## Data flow
+## Navigation and presentation
 
-```
-Compose screen -> ViewModel (StateFlow<UiState>) -> ModuleRepository / RootExecutor -> ModuleApi / su
-```
+`HerculesRoot` owns the shared `CatalogViewModel`, so Featured category selections and Browse filters use the same state. The three tabs are Featured, Browse, and Installed. Featured combines Spotlight banners, a 2-by-2 category grid, and recently updated packages. Browse uses flat 73 dp module rows with 0.5 dp dividers inset to the title. `ModuleDomainIcon` chooses a rounded Material icon from package metadata. GET and UPDATE actions use the shared `#14B8A6` accent.
 
-- Catalog: `ModuleRepository.refresh()` loads `MockModules` or `CATALOG_URL` into `catalog: StateFlow<CatalogState>`. `CatalogViewModel` combines it with filter state (query, root filter, sort, hide outdated) and the GitHub lookup state into `CatalogUiState`. Pasting a GitHub URL triggers `lookupGithub` (repo info plus latest release asset) and shows a card above the list.
-- Details: selecting a card sets `CatalogUiState.selected`; `ModuleDetailsSheet` renders it. Inspect Scripts calls `ModuleRepository.inspectScripts`, which uses embedded scripts or downloads the archive and reads top-level `*.sh` plus `update-binary`, then runs `ScriptAnalyzer`.
-- Install: any Install or Update button calls `InstallViewModel.install(module)`. Pipeline: `ModuleRepository.download` (cached in `cacheDir/downloads`) -> `RootExecutor.detectManager` (ksud, apd, magisk) -> `RootExecutor.installModule`, which streams stdout and stderr as `ShellEvent`s into `InstallUiState.log`. `ConsoleSheet` renders the log; Reboot appears on success. The sheet cannot be dismissed while running.
-- Installed: `InstalledViewModel.refresh()` reads `/data/adb/modules/*/module.prop` through `su`, then matches by `id` against the catalog and flags entries where catalog `versionCode` is greater.
+`GlassSurface` applies Haze backdrop effects to the floating tab bar, status and settings controls, and sheets. `SettingsSheet` updates the Liquid Glass toggle immediately and persists it in `SharedPreferences` from `HerculesRoot`. There is no separate `SettingsStore` class in this release. When the toggle is off, glass surfaces use opaque Material surfaces.
 
-## Catalog JSON schema
+## Data and installation flow
 
-```json
-{ "modules": [ {
-  "id": "tricky_store", "name": "TrickyStore", "author": "5ec1cff",
-  "description": "...", "version": "1.3.0", "versionCode": 130,
-  "stars": 1420, "updatedAt": 1760000000000, "sizeBytes": 612000,
-  "downloadUrl": "https://.../module.zip", "repoUrl": "https://github.com/...",
-  "managers": ["MAGISK", "KERNELSU", "APATCH"], "lsposed": false,
-  "readme": "", "changelog": ""
-} ] }
+```text
+Compose screen -> ViewModel -> ModuleRepository -> ModuleApi
+                           -> InstalledStore -> RootExecutor -> su
 ```
 
-`id` must equal the `id` in the module's `module.prop`; that is how installed modules are matched. Unknown keys are ignored.
+`ModuleRepository` fetches the catalog from `BuildConfig.CATALOG_URL` and falls back to the bundled resource if the request fails. `ModuleApi` handles catalog and GitHub requests and streams package downloads. `CatalogViewModel` combines repository state with search, root filters, sorting, selected categories, and installed status.
 
-## Extending
+Selecting a package opens `ModuleDetailsSheet`. ZIP script inspection reads embedded script entries or downloads the ZIP, then passes the results to `ScriptAnalyzer`. Script inspection is not a prerequisite for installation.
 
-- New filter: add to `Filters` and `applyFilters` in `CatalogViewModel`, add a chip in `FilterRow`, add strings.
-- New root manager: extend `RootManager`, `RootExecutor.installCommand` and the detection command.
-- New script rule: add a `Rule` in `ScriptAnalyzer`, a `FindingKind` value, and a string mapped in `ModuleDetailsSheet`.
-- Persistence (favorites, cached catalog): add a store behind `ModuleRepository`; screens do not change.
+`InstallViewModel` downloads packages into the app cache and streams installer output to `ConsoleSheet`. ZIP modules are installed through the detected Magisk, KernelSU, or APatch command. APK modules use `pm install -r` and can then be enabled in an Xposed manager. Installed state comes from root-manager module metadata and the package manager; version codes drive update status.
 
-## Rules
+## Design and code conventions
 
-- No comments, no TODO stubs, no emojis. Icons are `Icons.Rounded.*` only.
-- Cards: 12.dp padding, 14.dp corners, 0.dp elevation, 1.dp `outlineVariant` border at 0.3 alpha.
-- One accent: primary color for Install, Update and selected chips.
-- Inter for prose, JetBrains Mono for versions, ids, counts and logs.
-- All UI strings live in `res/values/strings.xml`.
+Keep screen layout in Compose and move catalog, install, and installed-state work into the existing view models and repositories. Reuse Material 3 color and type roles; use Inter for interface text and JetBrains Mono for identifiers, versions, and console output. Use `Icons.Rounded.*` for vector icons.
+
+Package lists stay flat: the module tile, title, one-line summary, and action capsule share a row, with a hairline divider aligned to the title. Keep action capsules on the shared teal accent and installed states visually quiet. The bundled catalog remains available as the offline fallback, and unknown catalog fields are ignored by the serializer.
+
+When adding a filter, update `RootFilter`, `CatalogViewModel` filtering, and the corresponding string resource. Root-manager support belongs in `RootManager` and `RootExecutor`; script checks belong in `ScriptAnalyzer` and the detail-sheet finding labels.
+
+## Build
+
+Use JDK 17 and Android SDK platform 35:
+
+```sh
+./gradlew assembleDebug
+```
+
+The Windows wrapper is available as `gradlew.bat`.

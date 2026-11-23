@@ -37,6 +37,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.hercules.store.R
@@ -44,27 +46,41 @@ import app.hercules.store.data.model.ModuleItem
 import app.hercules.store.ui.HerculesViewModelFactory
 import app.hercules.store.ui.components.HerculesCard
 import app.hercules.store.ui.components.HerculesShapes
+import app.hercules.store.ui.components.SectionHeader
+import app.hercules.store.ui.components.systemNavigationBottomInset
 import app.hercules.store.ui.details.ModuleDetailsSheet
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CatalogScreen(
     onInstall: (ModuleItem) -> Unit,
+    onBrowse: () -> Unit = {},
+    featuredMode: Boolean = false,
     modifier: Modifier = Modifier,
+    hazeState: HazeState? = null,
+    liquidGlassEnabled: Boolean = true,
     viewModel: CatalogViewModel = viewModel(factory = HerculesViewModelFactory)
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshInstalled() }
 
     Column(modifier.fillMaxSize()) {
-        SearchField(query = state.query, onChange = viewModel::onQueryChange)
-        FilterRow(
-            rootFilter = state.rootFilter,
-            sort = state.sort,
-            hideOutdated = state.hideOutdated,
-            onRootFilter = viewModel::onRootFilter,
-            onSort = viewModel::onSort,
-            onHideOutdated = viewModel::onHideOutdated
-        )
+        if (!featuredMode) {
+            SearchField(query = state.query, onChange = viewModel::onQueryChange)
+            FilterRow(
+                rootFilter = state.rootFilter,
+                sort = state.sort,
+                hideOutdated = state.hideOutdated,
+                onRootFilter = viewModel::onRootFilter,
+                onSort = viewModel::onSort,
+                onHideOutdated = viewModel::onHideOutdated
+            )
+            state.stack?.let { selectedStack ->
+                CuratedStacks(selected = selectedStack, onSelect = viewModel::onStack)
+            }
+        }
         PullToRefreshBox(
             isRefreshing = state.loading,
             onRefresh = viewModel::refresh,
@@ -72,19 +88,36 @@ fun CatalogScreen(
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            CatalogList(
-                state = state,
-                onOpen = viewModel::select,
-                onInstall = onInstall,
-                onRetry = viewModel::refresh
-            )
+            if (featuredMode) {
+                FeaturedLanding(
+                    state = state,
+                    onOpen = viewModel::select,
+                    onInstall = onInstall,
+                    onSelectCategory = viewModel::onStack,
+                    onBrowse = onBrowse,
+                    hazeState = hazeState,
+                    liquidGlassEnabled = liquidGlassEnabled
+                )
+            } else {
+                CatalogList(
+                    state = state,
+                    onOpen = viewModel::select,
+                    onInstall = onInstall,
+                    onRetry = viewModel::refresh,
+                    hazeState = hazeState,
+                    liquidGlassEnabled = liquidGlassEnabled
+                )
+            }
         }
     }
 
     state.selected?.let { module ->
         ModuleDetailsSheet(
             module = module,
+            status = state.installed.status(module),
             onDismiss = { viewModel.select(null) },
+            hazeState = hazeState,
+            liquidGlassEnabled = liquidGlassEnabled,
             onInstall = {
                 viewModel.select(null)
                 onInstall(module)
@@ -98,23 +131,28 @@ private fun CatalogList(
     state: CatalogUiState,
     onOpen: (ModuleItem) -> Unit,
     onInstall: (ModuleItem) -> Unit,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    hazeState: HazeState?,
+    liquidGlassEnabled: Boolean
 ) {
+    val inset = Modifier.padding(horizontal = 12.dp)
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        modifier = Modifier.fillMaxSize().let { if (liquidGlassEnabled && hazeState != null) it.hazeSource(state = hazeState) else it },
+        contentPadding = PaddingValues(top = 8.dp, bottom = 12.dp + systemNavigationBottomInset()),
+        verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
         when (val lookup = state.lookup) {
             GithubLookup.Idle -> Unit
             GithubLookup.Loading -> item(key = "lookup") {
-                LoadingRow(stringResource(R.string.github_resolving))
+                LoadingRow(stringResource(R.string.github_resolving), inset)
             }
             is GithubLookup.Found -> item(key = "lookup") {
                 ModuleCard(
                     module = lookup.module,
+                    status = state.installed.status(lookup.module),
                     onClick = { onOpen(lookup.module) },
-                    onInstall = { onInstall(lookup.module) }
+                    onInstall = { onInstall(lookup.module) },
+                    modifier = inset
                 )
             }
             is GithubLookup.Failed -> item(key = "lookup") {
@@ -122,13 +160,13 @@ private fun CatalogList(
                     text = stringResource(R.string.github_failed, lookup.message.orEmpty()),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(4.dp)
+                    modifier = inset.padding(4.dp)
                 )
             }
         }
         state.error?.let { message ->
             item(key = "error") {
-                HerculesCard(modifier = Modifier.fillMaxWidth()) {
+                HerculesCard(modifier = inset.fillMaxWidth()) {
                     Text(
                         text = stringResource(R.string.catalog_error, message),
                         style = MaterialTheme.typography.bodyMedium,
@@ -140,7 +178,7 @@ private fun CatalogList(
         }
         if (state.modules.isEmpty() && !state.loading && state.error == null && state.lookup !is GithubLookup.Found) {
             item(key = "empty") {
-                Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                Box(inset.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
                     Text(
                         text = stringResource(R.string.catalog_empty),
                         style = MaterialTheme.typography.bodyMedium,
@@ -149,20 +187,27 @@ private fun CatalogList(
                 }
             }
         }
+        if (state.modules.isNotEmpty()) {
+            item(key = "header_modules") {
+                SectionHeader(stringResource(R.string.section_modules, state.modules.size), modifier = inset)
+            }
+        }
         items(state.modules, key = { it.id }) { module ->
             ModuleCard(
                 module = module,
+                status = state.installed.status(module),
                 onClick = { onOpen(module) },
-                onInstall = { onInstall(module) }
+                onInstall = { onInstall(module) },
+                modifier = inset
             )
         }
     }
 }
 
 @Composable
-private fun LoadingRow(text: String) {
+private fun LoadingRow(text: String, modifier: Modifier = Modifier) {
     Row(
-        modifier = Modifier.padding(4.dp),
+        modifier = modifier.padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

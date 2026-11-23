@@ -51,25 +51,39 @@ class RootExecutor {
             else -> null
         }
 
-    suspend fun listInstalledModules(): List<InstalledModule> =
-        ModulePropParser.parse(run(LIST_COMMAND).stdout)
+    suspend fun listInstalledModules(): List<InstalledModule> {
+        val live = ModulePropParser.parse(run(listCommand(MODULES_DIR)).stdout)
+        val pending = ModulePropParser.parse(run(listCommand(PENDING_DIR)).stdout)
+        val liveById = live.associateBy { it.id }
+        val merged = LinkedHashMap<String, InstalledModule>()
+        live.forEach { merged[it.id] = it }
+        pending.forEach { merged[it.id] = it.copy(enabled = liveById[it.id]?.enabled ?: it.enabled) }
+        return merged.values.toList()
+    }
+
+    suspend fun listInstalledPackages(): Map<String, Int> =
+        PackageListParser.parse(run(PACKAGES_COMMAND).stdout)
 
     fun installModule(manager: RootManager, file: File): Flow<ShellEvent> =
         stream(installCommand(manager, file))
+
+    fun installApk(file: File): Flow<ShellEvent> = stream(apkCommand(file))
 
     suspend fun reboot() {
         run("reboot")
     }
 
     private fun installCommand(manager: RootManager, file: File): String {
+        if (file.extension.equals("apk", ignoreCase = true)) return apkCommand(file)
         val path = quote(file.absolutePath)
-        if (file.extension.equals("apk", ignoreCase = true)) return "pm install -r $path"
         return when (manager) {
             RootManager.MAGISK -> "magisk --install-module $path"
             RootManager.KERNELSU -> "ksud module install $path"
             RootManager.APATCH -> "apd module install $path"
         }
     }
+
+    private fun apkCommand(file: File): String = "pm install -r ${quote(file.absolutePath)}"
 
     private fun stream(command: String): Flow<ShellEvent> = channelFlow {
         val process = try {
@@ -116,8 +130,12 @@ class RootExecutor {
                 "elif [ -x /data/adb/apd ] || command -v apd >/dev/null 2>&1; then echo APATCH; " +
                 "elif command -v magisk >/dev/null 2>&1; then echo MAGISK; fi"
 
-        const val LIST_COMMAND =
-            "for d in /data/adb/modules/*/; do " +
+        const val MODULES_DIR = "/data/adb/modules"
+        const val PENDING_DIR = "/data/adb/modules_update"
+        const val PACKAGES_COMMAND = "pm list packages --show-versioncode"
+
+        fun listCommand(dir: String): String =
+            "for d in $dir/*/; do " +
                 "if [ -f \"\$d\"module.prop ]; then " +
                 "echo '$MODULE_MARKER'; cat \"\$d\"module.prop; echo; " +
                 "if [ -f \"\$d\"disable ]; then echo disabled=true; fi; " +
@@ -145,4 +163,15 @@ internal object ModulePropParser {
                 enabled = props["disabled"] != "true"
             )
         }
+}
+
+internal object PackageListParser {
+    private val line = Regex("""^package:(\S+)(?:\s+versionCode:(\d+))?""")
+
+    fun parse(output: String): Map<String, Int> =
+        output.lineSequence().mapNotNull { raw ->
+            val match = line.find(raw.trim()) ?: return@mapNotNull null
+            val code = match.groupValues[2].toLongOrNull()?.coerceAtMost(Int.MAX_VALUE.toLong())?.toInt() ?: 0
+            match.groupValues[1] to code
+        }.toMap()
 }

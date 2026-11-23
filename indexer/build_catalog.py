@@ -4,9 +4,11 @@ import bz2
 import json
 import lzma
 import os
+import random
 import re
 import struct
 import sys
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -14,6 +16,7 @@ import urllib.request
 import zlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
+from itertools import zip_longest
 from pathlib import Path
 
 API_ROOT = "https://api.github.com"
@@ -41,12 +44,73 @@ EXCLUDED_DIRS = {
 }
 README_NAMES = ("readme.md", "readme.markdown", "readme.rst", "readme.txt", "readme")
 UPDATE_JSON_KEYS = ("updateJson", "updateJsonUrl", "update_json")
-SEARCH_QUERIES = (
+STAR_BUCKETS = ("stars:>100", "stars:25..100", "stars:5..25", "stars:1..4")
+SEARCH_TERMS = (
     "topic:magisk-module",
-    "topic:kernelsu stars:>3",
-    "magisk module in:name,description stars:>10",
-    "module.prop in:readme stars:>10",
+    "topic:kernelsu-module",
+    "topic:apatch-module",
+    "topic:zygisk-module",
+    "topic:zygisk",
+    "topic:lsposed-module",
+    "topic:xposed-module",
+    '"magisk module" in:name,description',
+    '"kernelsu module" in:name,description',
+    '"lsposed" in:name,description',
 )
+SEARCH_QUERIES = tuple(
+    "{} {}".format(term, bucket) for bucket in STAR_BUCKETS for term in SEARCH_TERMS
+)
+SEARCH_PAGE_SIZE = 100
+SEARCH_MAX_PAGES = 10
+ORGANIZATIONS = (
+    "Xposed-Modules-Repo",
+    "Magisk-Modules-Alt-Repo",
+    "Magisk-Modules-Repo",
+)
+INDEX_URLS = (
+    "https://magisk-modules-alt-repo.github.io/json/modules.json",
+    "https://apt.izzysoft.de/magisk/json/modules.json",
+)
+INDEX_URL_KEYS = {
+    "source",
+    "sources",
+    "homepage",
+    "support",
+    "repo",
+    "repository",
+    "github",
+    "url",
+    "prop_url",
+    "propUrl",
+    "zip_url",
+    "zipUrl",
+    "notes_url",
+    "notesUrl",
+    "changelog",
+}
+GITHUB_REFERENCE = re.compile(
+    r"^https?://(?:www\.)?(?:github\.com|raw\.githubusercontent\.com)/"
+    r"([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)"
+)
+RESERVED_OWNERS = {
+    "sponsors",
+    "orgs",
+    "topics",
+    "features",
+    "marketplace",
+    "settings",
+    "apps",
+    "users",
+    "user-attachments",
+}
+XPOSED_ORGANIZATION = "Xposed-Modules-Repo"
+DISPLAY_NAME_LIMIT = 50
+PACKAGE_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)+$")
+SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+")
+XPOSED_KEYWORDS = {"lsposed", "xposed"}
+MAX_RATE_WAIT = 300.0
+DEFAULT_MAX_REPOS = 2500
+DEFAULT_WORKERS = 10
 SEED_REPOS = (
     "5ec1cff/TrickyStore",
     "osm0sis/PlayIntegrityFork",
@@ -88,10 +152,15 @@ class NotFound(GithubError):
 
 
 class Github:
-    def __init__(self, token=None, timeout=30.0, retries=4):
+    def __init__(self, token=None, timeout=30.0, retries=5):
         self.token = token
         self.timeout = timeout
         self.retries = retries
+        self.search_interval = 2.2 if token else 6.5
+        self._lock = threading.Lock()
+        self._search_lock = threading.Lock()
+        self._next_search = 0.0
+        self._resume = {}
 
     def _headers(self, url, accept):
         headers = {
@@ -104,9 +173,46 @@ class Github:
             headers["Authorization"] = "Bearer " + self.token
         return headers
 
+    def _await(self, host, url):
+        while True:
+            with self._lock:
+                remaining = self._resume.get(host, 0.0) - time.time()
+            if remaining <= 0:
+                return
+            if remaining > MAX_RATE_WAIT:
+                raise GithubError("Rate limit exhausted for {}".format(url))
+            time.sleep(remaining)
+
+    def _pause(self, host, delay):
+        with self._lock:
+            until = time.time() + delay + random.uniform(0.0, 1.5)
+            self._resume[host] = max(self._resume.get(host, 0.0), until)
+
+    @staticmethod
+    def _rate_limit_delay(error, body):
+        if error.code not in (403, 429):
+            return None
+        headers = error.headers or {}
+        retry_after = headers.get("Retry-After")
+        if retry_after:
+            try:
+                return max(1.0, float(retry_after))
+            except ValueError:
+                return 30.0
+        if headers.get("X-RateLimit-Remaining") == "0":
+            try:
+                return max(1.0, float(headers.get("X-RateLimit-Reset")) - time.time() + 2.0)
+            except (TypeError, ValueError):
+                return 60.0
+        if error.code == 429 or "rate limit" in body.lower():
+            return 60.0
+        return None
+
     def _request(self, url, accept):
+        host = urllib.parse.urlparse(url).hostname
         last_error = None
         for attempt in range(self.retries + 1):
+            self._await(host, url)
             request = urllib.request.Request(url, headers=self._headers(url, accept))
             try:
                 with urllib.request.urlopen(request, timeout=self.timeout) as response:
@@ -115,29 +221,16 @@ class Github:
                 if error.code == 404:
                     raise NotFound(url) from error
                 last_error = error
-                if error.code in (403, 429) and attempt < self.retries:
-                    reset = error.headers.get("X-RateLimit-Reset") if error.headers else None
-                    retry_after = error.headers.get("Retry-After") if error.headers else None
-                    remaining = error.headers.get("X-RateLimit-Remaining") if error.headers else None
-                    if retry_after:
-                        try:
-                            time.sleep(min(float(retry_after), 120.0))
-                        except ValueError:
-                            time.sleep(15.0)
-                        continue
-                    if remaining == "0" or error.code == 429:
-                        wait = 15.0
-                        if reset:
-                            try:
-                                wait = max(1.0, float(reset) - time.time() + 2.0)
-                            except ValueError:
-                                wait = 15.0
-                        time.sleep(min(wait, 120.0))
-                        continue
-                if attempt < self.retries and error.code >= 500:
+                body = error.read().decode("utf-8", "replace")[:300]
+                delay = self._rate_limit_delay(error, body)
+                if delay is not None:
+                    self._pause(host, delay)
+                    if delay > MAX_RATE_WAIT or attempt >= self.retries:
+                        raise GithubError("Rate limited for {}".format(url)) from error
+                    continue
+                if error.code >= 500 and attempt < self.retries:
                     time.sleep(2 ** attempt)
                     continue
-                body = error.read().decode("utf-8", "replace")[:300]
                 raise GithubError("HTTP {} for {}: {}".format(error.code, url, body)) from error
             except (urllib.error.URLError, TimeoutError, OSError) as error:
                 last_error = error
@@ -167,14 +260,36 @@ class Github:
             return ""
         return payload[:limit].decode("utf-8", "replace")
 
-    def search_repositories(self, query, per_page=100):
+    def search_page(self, query, page):
+        with self._search_lock:
+            wait = self._next_search - time.monotonic()
+            if wait > 0:
+                time.sleep(wait)
+            self._next_search = time.monotonic() + self.search_interval
         data = self.json(
             "/search/repositories",
-            {"q": query, "sort": "stars", "order": "desc", "per_page": per_page},
+            {
+                "q": query,
+                "sort": "stars",
+                "order": "desc",
+                "per_page": SEARCH_PAGE_SIZE,
+                "page": page,
+            },
         )
-        if not isinstance(data, dict):
-            return []
-        return data.get("items") or []
+        return data if isinstance(data, dict) else {}
+
+    def organization_page(self, organization, page):
+        data = self.json(
+            "/orgs/{}/repos".format(organization),
+            {
+                "type": "public",
+                "sort": "updated",
+                "direction": "desc",
+                "per_page": 100,
+                "page": page,
+            },
+        )
+        return data if isinstance(data, list) else []
 
 
 def raw_url(full_name, branch, path):
@@ -596,6 +711,45 @@ def remote_size(url):
         return 0
 
 
+def is_xposed_repository(info, full_name):
+    owner = full_name.split("/", 1)[0].lower()
+    if owner == XPOSED_ORGANIZATION.lower():
+        return True
+    topics = {str(topic).lower() for topic in (info.get("topics") or [])}
+    if topics & XPOSED_KEYWORDS:
+        return True
+    text = " ".join((info.get("name") or "", info.get("description") or "")).lower()
+    return any(keyword in text for keyword in XPOSED_KEYWORDS)
+
+
+def xposed_apk(info, full_name, release_downloads):
+    if not is_xposed_repository(info, full_name):
+        return None
+    for asset in release_downloads:
+        if urllib.parse.urlparse(str(asset["url"])).path.lower().endswith(".apk"):
+            return asset
+    return None
+
+
+def repository_display_name(info, full_name, module_id):
+    repo_name = info.get("name") or module_id
+    owner = full_name.split("/", 1)[0].lower()
+    if owner != XPOSED_ORGANIZATION.lower() or not PACKAGE_NAME_PATTERN.match(repo_name):
+        return single_line(repo_name, 100)
+    description = single_line(info.get("description"), DESCRIPTION_LIMIT)
+    sentence = SENTENCE_BREAK.split(description, 1)[0].rstrip(".!?").strip()
+    label = sentence[:DISPLAY_NAME_LIMIT].rstrip()
+    return label or single_line(repo_name, 100)
+
+
+def apk_module_id(info, full_name):
+    name = info.get("name") or full_name.split("/", 1)[-1]
+    if ID_PATTERN.match(name):
+        return name
+    cleaned = re.sub(r"[^A-Za-z0-9._-]", "_", name).strip("_")[:96]
+    return cleaned or re.sub(r"[^A-Za-z0-9._-]", "_", full_name)[:96]
+
+
 def update_json_download(github, prop, branch, full_name):
     location = ""
     for key in UPDATE_JSON_KEYS:
@@ -648,8 +802,9 @@ def repo_zip_download(github, full_name, branch):
     }
 
 
-def build_module(github, full_name, warnings):
-    info = github.json("/repos/{}".format(full_name))
+def build_module(github, full_name, info, warnings):
+    if not isinstance(info, dict) or not info.get("default_branch"):
+        info = github.json("/repos/{}".format(full_name))
     if not isinstance(info, dict):
         warnings.append("{}: repository not available".format(full_name))
         return None
@@ -672,12 +827,6 @@ def build_module(github, full_name, warnings):
         parse_module_prop(github.text(raw_url(full_name, branch, prop_path)))
         if prop_path
         else {}
-    )
-
-    readme_path = select_readme(paths)
-    readme = clean_text(
-        github.text(raw_url(full_name, branch, readme_path)) if readme_path else "",
-        README_LIMIT,
     )
 
     release = latest_release(github, full_name)
@@ -712,8 +861,21 @@ def build_module(github, full_name, warnings):
 
     module_id = prop.get("id", "").strip()
     if not ID_PATTERN.match(module_id):
-        warnings.append("{}: module.prop not found or invalid".format(full_name))
-        return None
+        apk = xposed_apk(info, full_name, release_downloads)
+        if apk is None:
+            warnings.append("{}: module.prop not found or invalid".format(full_name))
+            return None
+        download = apk
+        prop = {}
+        zip_xposed = True
+        module_id = apk_module_id(info, full_name)
+        update = None
+
+    readme_path = select_readme(paths)
+    readme = clean_text(
+        github.text(raw_url(full_name, branch, readme_path)) if readme_path else "",
+        README_LIMIT,
+    )
 
     version = single_line(prop.get("version"), 100)
     version_code = parse_int(prop.get("versionCode"))
@@ -733,7 +895,7 @@ def build_module(github, full_name, warnings):
     owner = (info.get("owner") or {}).get("login") or ""
     name = single_line(prop.get("name"), 100)
     if not name or has_placeholder(name):
-        name = single_line(info.get("name") or module_id, 100)
+        name = repository_display_name(info, full_name, module_id)
     author = single_line(prop.get("author"), 100)
     if not author or has_placeholder(author):
         author = single_line(owner, 100)
@@ -765,29 +927,135 @@ def build_module(github, full_name, warnings):
     return module
 
 
-def discover_repositories(github, limit, warnings):
-    discovered = []
-    seen = set()
+def candidate_from_item(item):
+    if not isinstance(item, dict):
+        return None
+    full_name = item.get("full_name")
+    if not full_name or item.get("fork") or item.get("archived"):
+        return None
+    return full_name, item
+
+
+def search_candidates(github, limit, warnings):
+    found = {}
     for query in SEARCH_QUERIES:
-        if len(discovered) >= limit:
+        if len(found) >= limit:
             break
-        try:
-            items = github.search_repositories(query)
-        except GithubError as error:
-            warnings.append("search '{}' failed: {}".format(query, error))
-            continue
-        for item in items:
-            full_name = item.get("full_name")
-            if not full_name or item.get("fork") or item.get("archived"):
-                continue
-            key = full_name.lower()
-            if key in seen:
-                continue
-            seen.add(key)
-            discovered.append(full_name)
-            if len(discovered) >= limit:
+        for page in range(1, SEARCH_MAX_PAGES + 1):
+            try:
+                data = github.search_page(query, page)
+            except GithubError as error:
+                warnings.append("search '{}' page {} failed: {}".format(query, page, error))
                 break
-    return discovered
+            items = data.get("items") or []
+            for item in items:
+                candidate = candidate_from_item(item)
+                if candidate:
+                    found.setdefault(candidate[0].lower(), candidate)
+            total = parse_int(data.get("total_count"))
+            if (
+                len(items) < SEARCH_PAGE_SIZE
+                or page * SEARCH_PAGE_SIZE >= total
+                or len(found) >= limit
+            ):
+                break
+    return list(found.values())
+
+
+def organization_candidates(github, organization, limit, warnings):
+    found = []
+    page = 1
+    while len(found) < limit:
+        try:
+            items = github.organization_page(organization, page)
+        except GithubError as error:
+            warnings.append("organization {} page {} failed: {}".format(organization, page, error))
+            break
+        for item in items:
+            candidate = candidate_from_item(item)
+            if candidate:
+                found.append(candidate)
+        if len(items) < 100:
+            break
+        page += 1
+    return found[:limit]
+
+
+def repository_from_url(value):
+    match = GITHUB_REFERENCE.match(value.strip())
+    if not match:
+        return None
+    owner, repo = match.groups()
+    if owner.lower() in RESERVED_OWNERS:
+        return None
+    if repo.endswith(".git"):
+        repo = repo[:-4]
+    if not repo:
+        return None
+    return "{}/{}".format(owner, repo)
+
+
+def index_references(node, key=None):
+    if isinstance(node, str):
+        if key in INDEX_URL_KEYS:
+            yield node
+    elif isinstance(node, dict):
+        for child_key, value in node.items():
+            yield from index_references(value, child_key)
+    elif isinstance(node, list):
+        for value in node:
+            yield from index_references(value, key)
+
+
+def index_candidates(github, url, warnings):
+    try:
+        data = github.json(url)
+    except GithubError as error:
+        warnings.append("index {} failed: {}".format(url, error))
+        return []
+    if data is None:
+        warnings.append("index {} not available".format(url))
+        return []
+    found = {}
+    for reference in index_references(data):
+        full_name = repository_from_url(reference)
+        if full_name:
+            found.setdefault(full_name.lower(), (full_name, None))
+    return list(found.values())
+
+
+def interleave(groups):
+    return [item for batch in zip_longest(*groups) for item in batch if item is not None]
+
+
+def discover_repositories(github, limit, warnings):
+    with ThreadPoolExecutor(max_workers=2 + len(ORGANIZATIONS)) as pool:
+        search = pool.submit(search_candidates, github, limit, warnings)
+        indexes = [pool.submit(index_candidates, github, url, warnings) for url in INDEX_URLS]
+        organizations = [
+            pool.submit(organization_candidates, github, organization, limit, warnings)
+            for organization in ORGANIZATIONS
+        ]
+        searched = search.result()
+        indexed = interleave([future.result() for future in indexes])
+        organized = interleave([future.result() for future in organizations])
+    return interleave([indexed, searched, organized])
+
+
+def merge_candidates(candidates):
+    merged = {}
+    order = []
+    for full_name, info in candidates:
+        full_name = full_name.strip()
+        key = full_name.lower()
+        if not key:
+            continue
+        if key not in merged:
+            merged[key] = (full_name, info)
+            order.append(key)
+        elif merged[key][1] is None and info is not None:
+            merged[key] = (merged[key][0], info)
+    return [merged[key] for key in order]
 
 
 def validate_catalog(catalog):
@@ -847,8 +1115,12 @@ def parse_args():
         description="Scrape GitHub for Magisk, KernelSU and APatch modules and write catalog/modules.json."
     )
     parser.add_argument("--out", default="catalog/modules.json", help="output path")
-    parser.add_argument("--max-repos", type=int, default=150, help="maximum repositories to inspect")
-    parser.add_argument("--workers", type=int, default=6, help="parallel repository workers")
+    parser.add_argument(
+        "--max-repos", type=int, default=DEFAULT_MAX_REPOS, help="maximum repositories to inspect"
+    )
+    parser.add_argument(
+        "--workers", type=int, default=DEFAULT_WORKERS, help="parallel repository workers"
+    )
     parser.add_argument("--seed-only", action="store_true", help="skip GitHub discovery")
     parser.add_argument("--no-seeds", action="store_true", help="skip the built-in seed repositories")
     parser.add_argument(
@@ -878,33 +1150,25 @@ def run():
         print("warning: GITHUB_TOKEN is not set, anonymous rate limits apply", file=sys.stderr)
 
     warnings = []
-    repositories = [] if args.no_seeds else list(SEED_REPOS)
-    repositories += list(args.include)
+    candidates = [] if args.no_seeds else [(name, None) for name in SEED_REPOS]
+    candidates += [(name, None) for name in args.include]
     if not args.seed_only:
-        remaining = max(0, args.max_repos - len(repositories))
+        remaining = max(0, args.max_repos - len(candidates))
         if remaining:
-            repositories += discover_repositories(github, remaining, warnings)
+            candidates += discover_repositories(github, remaining, warnings)
 
-    unique_repositories = []
-    seen_repositories = set()
-    for full_name in repositories:
-        key = full_name.strip().lower()
-        if not key or key in seen_repositories:
-            continue
-        seen_repositories.add(key)
-        unique_repositories.append(full_name.strip())
+    unique_candidates = merge_candidates(candidates)[: max(0, args.max_repos)]
+    workers = max(1, args.workers)
 
     print(
-        "inspecting {} repositories with {} workers".format(
-            len(unique_repositories), max(1, args.workers)
-        ),
+        "inspecting {} repositories with {} workers".format(len(unique_candidates), workers),
         file=sys.stderr,
     )
     modules = []
-    with ThreadPoolExecutor(max_workers=max(1, args.workers)) as pool:
+    with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {
-            pool.submit(build_module, github, full_name, warnings): full_name
-            for full_name in unique_repositories
+            pool.submit(build_module, github, full_name, info, warnings): full_name
+            for full_name, info in unique_candidates
         }
         for future in as_completed(futures):
             full_name = futures[future]

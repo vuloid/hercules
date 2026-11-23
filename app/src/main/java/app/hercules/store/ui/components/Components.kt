@@ -13,8 +13,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -25,8 +27,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
 import app.hercules.store.ui.theme.HerculesMono
+import app.hercules.store.ui.theme.SileoAccent
 
 object HerculesShapes {
     val Card = RoundedCornerShape(14.dp)
@@ -42,14 +49,14 @@ fun HerculesCard(
 ) {
     val colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
     val elevation = CardDefaults.cardElevation(
-        defaultElevation = 0.dp,
+        defaultElevation = 2.dp,
         pressedElevation = 0.dp,
-        focusedElevation = 0.dp,
-        hoveredElevation = 0.dp,
-        draggedElevation = 0.dp,
+        focusedElevation = 2.dp,
+        hoveredElevation = 3.dp,
+        draggedElevation = 4.dp,
         disabledElevation = 0.dp
     )
-    val border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+    val border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     val body: @Composable ColumnScope.() -> Unit = {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             content()
@@ -108,20 +115,46 @@ fun AccentButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    icon: ImageVector? = null
+    icon: ImageVector? = null,
+    accentColor: Color = SileoAccent
 ) {
+    val haptic = LocalHapticFeedback.current
+    val scheme = MaterialTheme.colorScheme
     Button(
-        onClick = onClick,
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onClick()
+        },
         modifier = modifier.height(32.dp),
         enabled = enabled,
-        shape = HerculesShapes.Control,
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp)
+        shape = CircleShape,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = accentColor,
+            contentColor = Color.White,
+            disabledContainerColor = scheme.surfaceContainerHigh,
+            disabledContentColor = scheme.onSurfaceVariant.copy(alpha = 0.55f)
+        ),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)
     ) {
         if (icon != null) {
             Icon(icon, contentDescription = null, modifier = Modifier.size(14.dp))
             Spacer(Modifier.width(6.dp))
         }
-        Text(text, style = MaterialTheme.typography.labelMedium)
+        Text(text, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
+    }
+}
+
+@Composable
+fun InstalledPill(text: String, modifier: Modifier = Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    Row(
+        modifier = modifier.height(30.dp)
+            .background(scheme.surfaceVariant.copy(alpha = 0.72f), CircleShape)
+            .border(1.dp, scheme.outlineVariant.copy(alpha = 0.55f), CircleShape)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold), color = scheme.onSurfaceVariant)
     }
 }
 
@@ -155,6 +188,8 @@ fun SectionHeader(text: String, modifier: Modifier = Modifier) {
         text = text,
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+        modifier = modifier
+            .padding(horizontal = 4.dp)
+            .padding(top = 10.dp, bottom = 2.dp)
     )
 }

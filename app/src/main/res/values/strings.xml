@@ -2,7 +2,11 @@
 <resources>
     <string name="app_name">Hercules</string>
     <string name="settings_title">Settings</string>
-    <string name="settings_build_version">v1.2.0</string>
+    <string name="settings_language">Language</string>
+    <string name="language_system">System</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    <string name="settings_build_version">v1.2.1</string>
     <string name="update_check_title">Check for app updates</string>
     <string name="update_check_subtitle">Current version: v%1$s · %2$s</string>
     <string name="update_checking">Checking for updates</string>

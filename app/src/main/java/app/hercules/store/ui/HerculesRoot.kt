@@ -280,6 +280,11 @@ fun HerculesRoot() {
                 scope.launch { repository.refresh() }
             },
             onClearCache = { context.cacheDir.deleteRecursively() },
+            selectedLanguage = preferences.getString("language", "system") ?: "system",
+            onLanguageChange = { language ->
+                preferences.edit().putString("language", language).apply()
+                (context as? android.app.Activity)?.recreate()
+            },
             updateState = updateState,
             onCheckUpdates = { scope.launch { updateController.check(manual = true) } },
             onDismiss = { showSettings = false }
@@ -297,6 +302,8 @@ private fun SettingsSheet(
     initialCatalogUrls: List<String>,
     onCatalogUrlsChange: (List<String>) -> Unit,
     onClearCache: () -> Unit,
+    selectedLanguage: String,
+    onLanguageChange: (String) -> Unit,
     updateState: app.hercules.store.data.remote.AppUpdateState,
     onCheckUpdates: () -> Unit,
     onDismiss: () -> Unit
@@ -313,6 +320,14 @@ private fun SettingsSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.settings_language), style = MaterialTheme.typography.titleMedium)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("system" to R.string.language_system, "en" to R.string.language_english, "ru" to R.string.language_russian).forEach { (code, label) ->
+                    TextButton(onClick = { onLanguageChange(code) }, enabled = selectedLanguage != code) {
+                        Text(stringResource(label))
+                    }
+                }
+            }
             TextButton(onClick = onCheckUpdates, modifier = Modifier.fillMaxWidth(), enabled = !updateState.checking) {
                 Column(Modifier.fillMaxWidth()) {
                     Text(stringResource(R.string.update_check_title), style = MaterialTheme.typography.titleMedium)

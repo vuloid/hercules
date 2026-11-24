@@ -1272,15 +1272,16 @@ def run():
                     pending.cancel()
                 break
 
-    by_id = {module.get("id"): module for module in existing_catalog["modules"] if module.get("id")}
+    # Start with the entire existing catalog. Incremental runs only fetch a
+    # subset of repositories, so their results must update this full map.
+    merged = {
+        module["id"]: module
+        for module in existing_catalog["modules"]
+        if module.get("id")
+    }
     for module in modules:
-        previous = by_id.get(module["id"])
-        if previous is None or (module["stars"], module["updatedAt"]) > (
-            previous["stars"],
-            previous["updatedAt"],
-        ):
-            by_id[module["id"]] = module
-    ordered = sorted(by_id.values(), key=lambda item: (-item["stars"], item["name"].lower(), item["id"]))
+        merged[module["id"]] = module
+    ordered = sorted(merged.values(), key=lambda item: (-item["stars"], item["name"].lower(), item["id"]))
     catalog = {"modules": ordered}
 
     try:

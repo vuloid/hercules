@@ -42,3 +42,5 @@ The debug APK is created at `app/build/outputs/apk/debug/app-debug.apk`.
 
 - [Source repository](https://github.com/vuloid/hercules)
 - [Releases](https://github.com/vuloid/hercules/releases)
+- [Telegram Channel](https://t.me/vuloid)
+- [4PDA Thread](https://4pda.to/forum/index.php?showtopic=1130241)

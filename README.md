@@ -1,6 +1,6 @@
 # Hercules
 
-Hercules is an Android app for browsing and installing modules on rooted devices. This repository contains version 1.0.1.
+Hercules is an Android app for browsing and installing modules on rooted devices.
 
 ## Features
 

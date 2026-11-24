@@ -9,20 +9,40 @@ android {
     namespace = "app.hercules.store"
     compileSdk = 35
 
+    val releaseSigningValues = listOf(
+        System.getenv("KEYSTORE_FILE"),
+        System.getenv("KEYSTORE_PASSWORD"),
+        System.getenv("KEY_ALIAS"),
+        System.getenv("KEY_PASSWORD")
+    )
+    val hasReleaseSigning = releaseSigningValues.all { !it.isNullOrBlank() }
+
     defaultConfig {
         applicationId = "app.hercules.store"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 3
+        versionName = "1.0.1"
         val catalogHost = "raw." + "githubusercontent.com"
         val catalogPath = "/vuloid/hercules/main/catalog/modules.json"
         buildConfigField("String", "CATALOG_URL", "\"https://$catalogHost$catalogPath\"")
 
     }
 
+    signingConfigs {
+        create("release") {
+            if (hasReleaseSigning) {
+                storeFile = file(releaseSigningValues[0]!!)
+                storePassword = releaseSigningValues[1]
+                keyAlias = releaseSigningValues[2]
+                keyPassword = releaseSigningValues[3]
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName(if (hasReleaseSigning) "release" else "debug")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

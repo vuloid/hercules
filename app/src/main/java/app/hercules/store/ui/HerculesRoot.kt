@@ -27,6 +27,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -78,6 +80,7 @@ import kotlinx.coroutines.launch
 import java.io.IOException
 import android.os.Build
 import app.hercules.store.BuildConfig
+import app.hercules.store.data.remote.AppUpdateController
 
 private enum class Destination(val route: String, @StringRes val label: Int, val icon: ImageVector) {
     Featured("featured", R.string.tab_featured, Icons.Rounded.Star),
@@ -113,6 +116,9 @@ fun HerculesRoot() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val updateController = remember { (context.applicationContext as HerculesApp).container.updates }
+    val updateState by updateController.state.collectAsStateWithLifecycle()
+    LaunchedEffect(updateController) { updateController.check(manual = false) }
     val hazeState = remember { HazeState() }
     val preferences = remember { context.getSharedPreferences("hercules_settings", android.content.Context.MODE_PRIVATE) }
     var liquidGlassEnabled by remember { mutableStateOf(preferences.getBoolean("liquidGlassEnabled", true)) }
@@ -169,6 +175,19 @@ fun HerculesRoot() {
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = scheme.background)
                 )
                 HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.4f))
+                updateState.release?.let { release ->
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp).glassSurface(hazeState, liquidGlassEnabled, RoundedCornerShape(20.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.update_banner_title), style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.update_available, release.version), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+                        Text(release.notes.ifBlank { stringResource(R.string.update_notes_empty) }.take(280), style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant, maxLines = 4)
+                        if (updateState.downloading) {
+                            LinearProgressIndicator(progress = { updateState.progress / 100f }, modifier = Modifier.fillMaxWidth())
+                            Text(stringResource(R.string.update_downloading, updateState.progress), style = MaterialTheme.typography.bodySmall)
+                        } else {
+                            Button(onClick = { scope.launch { updateController.install(release) } }) { Text(stringResource(R.string.update_action)) }
+                        }
+                    }
+                }
             }
         },
         bottomBar = {
@@ -261,6 +280,8 @@ fun HerculesRoot() {
                 scope.launch { repository.refresh() }
             },
             onClearCache = { context.cacheDir.deleteRecursively() },
+            updateState = updateState,
+            onCheckUpdates = { scope.launch { updateController.check(manual = true) } },
             onDismiss = { showSettings = false }
         )
     }
@@ -276,6 +297,8 @@ private fun SettingsSheet(
     initialCatalogUrls: List<String>,
     onCatalogUrlsChange: (List<String>) -> Unit,
     onClearCache: () -> Unit,
+    updateState: app.hercules.store.data.remote.AppUpdateState,
+    onCheckUpdates: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -290,6 +313,26 @@ private fun SettingsSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.titleLarge)
+            TextButton(onClick = onCheckUpdates, modifier = Modifier.fillMaxWidth(), enabled = !updateState.checking) {
+                Column(Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.update_check_title), style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        stringResource(
+                            R.string.update_check_subtitle,
+                            BuildConfig.VERSION_NAME,
+                            when {
+                                updateState.checking -> stringResource(R.string.update_checking)
+                                updateState.release != null -> stringResource(R.string.update_available, updateState.release.version)
+                                updateState.status == "check_failed" -> stringResource(R.string.update_check_failed)
+                                updateState.status == "up_to_date" || updateState.status == "checked_recently" -> stringResource(R.string.update_up_to_date)
+                                else -> stringResource(R.string.update_check_idle)
+                            }
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = scheme.onSurfaceVariant
+                    )
+                }
+            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column {
                     Text(stringResource(R.string.settings_glass), style = MaterialTheme.typography.titleMedium)

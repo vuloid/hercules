@@ -8,6 +8,8 @@ import app.hercules.store.root.RootExecutor
 import okhttp3.OkHttpClient
 import java.io.File
 import java.util.concurrent.TimeUnit
+import app.hercules.store.data.remote.AppUpdateChecker
+import app.hercules.store.data.remote.AppUpdateController
 
 class AppContainer(application: Application) {
     private val preferences = application.getSharedPreferences("hercules_settings", Application.MODE_PRIVATE)
@@ -17,6 +19,13 @@ class AppContainer(application: Application) {
         .build()
 
     val rootExecutor = RootExecutor()
+    val updates = AppUpdateController(
+        checker = AppUpdateChecker(client, preferences),
+        rootExecutor = rootExecutor,
+        client = client,
+        cacheDir = application.cacheDir,
+        application = application
+    )
 
     val installedStore = InstalledStore(rootExecutor)
 

@@ -2,7 +2,21 @@
 <resources>
     <string name="app_name">Hercules</string>
     <string name="settings_title">Settings</string>
-    <string name="settings_build_version">v1.1.0</string>
+    <string name="settings_build_version">v1.2.0</string>
+    <string name="update_check_title">Check for app updates</string>
+    <string name="update_check_subtitle">Current version: v%1$s · %2$s</string>
+    <string name="update_checking">Checking for updates</string>
+    <string name="update_check_idle">Tap to check now</string>
+    <string name="update_available">Version %1$s is available</string>
+    <string name="update_banner_title">Hercules update available</string>
+    <string name="update_notes_empty">Release notes are not available.</string>
+    <string name="update_action">Update</string>
+    <string name="update_downloading">Downloading update: %1$d%%</string>
+    <string name="update_up_to_date">You have the latest version</string>
+    <string name="update_check_failed">Could not check for updates</string>
+    <string name="update_installed">Update installed</string>
+    <string name="update_installer_opened">APK installer opened</string>
+    <string name="update_download_failed">Could not download update</string>
     <string name="settings_glass">Liquid Glass (iOS 26)</string>
     <string name="settings_glass_subtitle">Live backdrop blur and specular edge</string>
     <string name="settings_refresh_catalog">Refresh catalog</string>

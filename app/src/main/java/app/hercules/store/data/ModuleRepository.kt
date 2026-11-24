@@ -25,7 +25,9 @@ import java.util.zip.ZipFile
 class ModuleRepository(
     private val api: ModuleApi,
     private val catalogUrl: String,
-    private val downloadDir: File
+    private val downloadDir: File,
+    private val loadCustomCatalogUrls: () -> List<String> = { emptyList() },
+    private val persistCustomCatalogUrls: (List<String>) -> Unit = {}
 ) {
     private val _catalog = MutableStateFlow(CatalogState(loading = true))
     val catalog: StateFlow<CatalogState> = _catalog.asStateFlow()
@@ -38,12 +40,24 @@ class ModuleRepository(
     suspend fun refresh() {
         _catalog.update { it.copy(loading = true, error = null) }
         try {
-            val modules = if (catalogUrl.isBlank()) {
-                loadBundledCatalog() ?: MockModules.all()
-            } else {
+            val defaultModules = if (catalogUrl.isBlank()) emptyList() else try {
                 api.fetchCatalog(catalogUrl)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                emptyList()
             }
-            _catalog.value = CatalogState(modules = modules)
+            val customModules = loadCustomCatalogUrls().map { it.trim() }.filter(String::isNotBlank).distinct().flatMap { url ->
+                try {
+                    api.fetchCatalog(url)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    emptyList()
+                }
+            }
+            val base = if (defaultModules.isEmpty()) loadBundledCatalog() ?: MockModules.all() else defaultModules
+            _catalog.value = CatalogState(modules = (base + customModules).distinctBy { it.id })
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -54,6 +68,12 @@ class ModuleRepository(
                 _catalog.update { it.copy(loading = false, error = e.message ?: e.javaClass.simpleName) }
             }
         }
+    }
+
+    fun customCatalogUrls(): List<String> = loadCustomCatalogUrls().map { it.trim() }.filter(String::isNotBlank).distinct()
+
+    fun saveCustomCatalogUrls(urls: List<String>) {
+        persistCustomCatalogUrls(urls.map { it.trim() }.filter(String::isNotBlank).distinct())
     }
 
     private suspend fun loadBundledCatalog(): List<ModuleItem>? = withContext(Dispatchers.IO) {

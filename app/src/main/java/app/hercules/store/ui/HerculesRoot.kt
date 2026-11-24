@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -75,6 +76,8 @@ import app.hercules.store.ui.status.RootStatusPill
 import app.hercules.store.ui.status.RootStatusViewModel
 import kotlinx.coroutines.launch
 import java.io.IOException
+import android.os.Build
+import app.hercules.store.BuildConfig
 
 private enum class Destination(val route: String, @StringRes val label: Int, val icon: ImageVector) {
     Featured("featured", R.string.tab_featured, Icons.Rounded.Star),
@@ -228,11 +231,20 @@ fun HerculesRoot() {
         ConsoleSheet(
             state = state,
             onDismiss = installViewModel::dismiss,
-            onReboot = installViewModel::reboot
+            onReboot = installViewModel::reboot,
+            diagnosticHeader = stringResource(
+                R.string.console_log_header,
+                BuildConfig.VERSION_NAME,
+                Build.VERSION.SDK_INT,
+                Build.VERSION.RELEASE,
+                Build.MODEL,
+                rootStatus.manager?.displayName ?: stringResource(R.string.status_no_root)
+            )
         )
     }
 
     if (showSettings) {
+        val repository = (context.applicationContext as HerculesApp).container.repository
         SettingsSheet(
             hazeState = hazeState,
             glassEnabled = liquidGlassEnabled,
@@ -241,7 +253,12 @@ fun HerculesRoot() {
                 preferences.edit().putBoolean("liquidGlassEnabled", it).apply()
             },
             onRefresh = {
-                scope.launch { (context.applicationContext as HerculesApp).container.repository.refresh() }
+                scope.launch { repository.refresh() }
+            },
+            initialCatalogUrls = repository.customCatalogUrls(),
+            onCatalogUrlsChange = { urls ->
+                repository.saveCustomCatalogUrls(urls)
+                scope.launch { repository.refresh() }
             },
             onClearCache = { context.cacheDir.deleteRecursively() },
             onDismiss = { showSettings = false }
@@ -256,10 +273,14 @@ private fun SettingsSheet(
     glassEnabled: Boolean,
     onGlassChange: (Boolean) -> Unit,
     onRefresh: () -> Unit,
+    initialCatalogUrls: List<String>,
+    onCatalogUrlsChange: (List<String>) -> Unit,
     onClearCache: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val scheme = MaterialTheme.colorScheme
+    var catalogUrls by rememberSaveable { mutableStateOf(initialCatalogUrls) }
+    var catalogDraft by rememberSaveable { mutableStateOf("") }
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = androidx.compose.ui.graphics.Color.Transparent) {
         Column(
             Modifier.fillMaxWidth().glassSurface(hazeState, glassEnabled, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
@@ -277,11 +298,37 @@ private fun SettingsSheet(
                 Switch(checked = glassEnabled, onCheckedChange = onGlassChange)
             }
             HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.25f), thickness = 1.dp)
+            Text(stringResource(R.string.settings_catalogs_title), style = MaterialTheme.typography.titleMedium)
+            OutlinedTextField(
+                value = catalogDraft,
+                onValueChange = { catalogDraft = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text(stringResource(R.string.settings_catalog_url_hint)) }
+            )
+            TextButton(onClick = {
+                val url = catalogDraft.trim()
+                if (url.isNotBlank() && url !in catalogUrls) {
+                    catalogUrls = catalogUrls + url
+                    onCatalogUrlsChange(catalogUrls)
+                }
+                catalogDraft = ""
+            }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.settings_catalog_add)) }
+            catalogUrls.forEach { url ->
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(url, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                    TextButton(onClick = {
+                        catalogUrls = catalogUrls - url
+                        onCatalogUrlsChange(catalogUrls)
+                    }) { Text(stringResource(R.string.settings_catalog_remove)) }
+                }
+            }
+            HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.25f), thickness = 1.dp)
             TextButton(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.settings_refresh_catalog)) }
             TextButton(onClick = onClearCache, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.settings_clear_cache)) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("vuloid/hercules", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
-                Text("v1.0.0", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                Text(stringResource(R.string.settings_build_version), style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
             }
         }
     }

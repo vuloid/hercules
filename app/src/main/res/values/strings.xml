@@ -2,10 +2,15 @@
 <resources>
     <string name="app_name">Hercules</string>
     <string name="settings_title">Settings</string>
+    <string name="settings_build_version">v1.1.0</string>
     <string name="settings_glass">Liquid Glass (iOS 26)</string>
     <string name="settings_glass_subtitle">Live backdrop blur and specular edge</string>
     <string name="settings_refresh_catalog">Refresh catalog</string>
     <string name="settings_clear_cache">Clear download cache</string>
+    <string name="settings_catalogs_title">Custom catalog URLs</string>
+    <string name="settings_catalog_url_hint">https://example.com/modules.json</string>
+    <string name="settings_catalog_add">Add catalog</string>
+    <string name="settings_catalog_remove">Remove</string>
 
     <string name="tab_catalog">Browse</string>
     <string name="tab_featured">Featured</string>
@@ -55,7 +60,8 @@
     <string name="scripts_loading">Reading scripts</string>
     <string name="scripts_failed">Could not read scripts: %1$s</string>
     <string name="scripts_none_found">No shell scripts found in this package</string>
-    <string name="scripts_clean">No suspicious patterns found in %1$d script files</string>
+    <string name="scripts_clean">No suspicious patterns found</string>
+    <string name="scripts_scope_subtitle">Static script inspection does not audit compiled binaries.</string>
     <string name="scripts_truncated">Showing the first %1$d lines</string>
 
     <string name="severity_high">HIGH</string>
@@ -70,6 +76,14 @@
     <string name="finding_permissive_chmod">Grants world-writable permissions</string>
 
     <string name="console_title">Installing %1$s</string>
+    <string name="console_copy_log">Copy Log</string>
+    <string name="console_save_log">Save Log</string>
+    <string name="console_log_copied">Installation log copied</string>
+    <string name="console_log_saved">Installation log saved</string>
+    <string name="console_log_clip_label">Hercules installation log</string>
+    <string name="console_log_filename">hercules-install-log.txt</string>
+    <string name="console_log_header">Hercules %1$s · Android %2$d (%3$s) · %4$s · Root: %5$s</string>
+    <string name="markdown_bullet">•</string>
     <string name="phase_downloading">Downloading</string>
     <string name="phase_installing">Installing</string>
     <string name="phase_success">Done</string>

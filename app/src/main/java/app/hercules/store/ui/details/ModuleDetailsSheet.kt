@@ -184,12 +184,12 @@ fun ModuleDetailsSheet(
             val description = module.readme.ifBlank { module.distinctDescription }
             if (description.isNotBlank() && !description.trim().equals(module.name.trim(), ignoreCase = true)) {
                 Section(stringResource(R.string.section_description)) {
-                    Text(description, style = MaterialTheme.typography.bodyMedium)
+                MarkdownText(description)
                 }
             }
             if (module.changelog.isNotBlank()) {
                 Section(stringResource(R.string.section_changelog)) {
-                    Text(module.changelog, style = HerculesMono.body)
+                    MarkdownText(module.changelog)
                 }
             }
             if (showScripts && !module.isApk) {
@@ -248,7 +248,12 @@ private fun ScriptsContent(state: ScriptState) {
 private fun ReportContent(report: ScriptReport) {
     if (report.files.isEmpty()) {
         Text(
-            text = stringResource(R.string.scripts_none_found),
+            text = stringResource(R.string.scripts_clean),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = stringResource(R.string.scripts_scope_subtitle),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -266,10 +271,15 @@ private fun ReportContent(report: ScriptReport) {
                 tint = MaterialTheme.colorScheme.primary
             )
             Text(
-                text = stringResource(R.string.scripts_clean, report.files.size),
+                text = stringResource(R.string.scripts_clean),
                 style = MaterialTheme.typography.bodySmall
             )
         }
+        Text(
+            text = stringResource(R.string.scripts_scope_subtitle),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     } else {
         report.findings.forEach { FindingRow(it) }
     }

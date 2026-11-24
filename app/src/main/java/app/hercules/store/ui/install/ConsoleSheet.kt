@@ -1,5 +1,10 @@
 package app.hercules.store.ui.install
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -17,6 +22,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.RestartAlt
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.SaveAlt
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.hercules.store.R
@@ -40,13 +48,15 @@ import app.hercules.store.ui.components.HerculesShapes
 import app.hercules.store.ui.components.MonoBadge
 import app.hercules.store.ui.components.QuietButton
 import app.hercules.store.ui.theme.HerculesMono
+import java.io.OutputStreamWriter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConsoleSheet(
     state: InstallUiState,
     onDismiss: () -> Unit,
-    onReboot: () -> Unit
+    onReboot: () -> Unit,
+    diagnosticHeader: String
 ) {
     val running by rememberUpdatedState(state.running)
     val sheetState = rememberModalBottomSheetState(
@@ -56,6 +66,21 @@ fun ConsoleSheet(
     val listState = rememberLazyListState()
     val scheme = MaterialTheme.colorScheme
     val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
+    val exportText = buildString {
+        appendLine(diagnosticHeader)
+        state.log.forEach { entry ->
+            appendLine(when (entry) {
+                is LogEntry.Shell -> entry.text
+                is LogEntry.System -> context.getString(entry.res, *entry.args.toTypedArray())
+            })
+        }
+    }
+    val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        if (uri != null) runCatching {
+            context.contentResolver.openOutputStream(uri)?.use { stream -> OutputStreamWriter(stream).use { it.write(exportText) } }
+        }.onSuccess { Toast.makeText(context, R.string.console_log_saved, Toast.LENGTH_SHORT).show() }
+    }
 
     LaunchedEffect(state.phase) {
         if (state.phase == InstallPhase.SUCCESS || state.phase == InstallPhase.FAILED) {
@@ -105,6 +130,12 @@ fun ConsoleSheet(
                 }
             }
 
+            Text(
+                text = diagnosticHeader,
+                style = HerculesMono.label,
+                color = scheme.onSurfaceVariant
+            )
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -119,6 +150,17 @@ fun ConsoleSheet(
                 ) {
                     items(state.log) { entry -> LogLine(entry) }
                 }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                QuietButton(text = stringResource(R.string.console_copy_log), onClick = {
+                    val clipboard = context.getSystemService(ClipboardManager::class.java)
+                    clipboard.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.console_log_clip_label), exportText))
+                    Toast.makeText(context, R.string.console_log_copied, Toast.LENGTH_SHORT).show()
+                }, icon = Icons.Rounded.ContentCopy)
+                QuietButton(text = stringResource(R.string.console_save_log), onClick = {
+                    saveLauncher.launch(context.getString(R.string.console_log_filename))
+                }, icon = Icons.Rounded.SaveAlt)
             }
 
             if (!state.running) {

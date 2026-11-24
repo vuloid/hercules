@@ -10,6 +10,7 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 class AppContainer(application: Application) {
+    private val preferences = application.getSharedPreferences("hercules_settings", Application.MODE_PRIVATE)
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -22,7 +23,9 @@ class AppContainer(application: Application) {
     val repository = ModuleRepository(
         api = ModuleApi(client),
         catalogUrl = BuildConfig.CATALOG_URL,
-        downloadDir = File(application.cacheDir, "downloads")
+        downloadDir = File(application.cacheDir, "downloads"),
+        loadCustomCatalogUrls = { preferences.getStringSet("customCatalogUrls", emptySet()).orEmpty().toList() },
+        persistCustomCatalogUrls = { urls -> preferences.edit().putStringSet("customCatalogUrls", urls.toSet()).apply() }
     )
 }
 

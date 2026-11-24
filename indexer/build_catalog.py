@@ -161,6 +161,8 @@ class Github:
         self._search_lock = threading.Lock()
         self._next_search = 0.0
         self._resume = {}
+        self.rate_limit_remaining = None
+        self.stop_for_rate_limit = threading.Event()
 
     def _headers(self, url, accept):
         headers = {
@@ -216,6 +218,17 @@ class Github:
             request = urllib.request.Request(url, headers=self._headers(url, accept))
             try:
                 with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                    remaining = response.headers.get("X-RateLimit-Remaining")
+                    if remaining is not None:
+                        try:
+                            remaining = int(remaining)
+                            with self._lock:
+                                if self.rate_limit_remaining is None or remaining < self.rate_limit_remaining:
+                                    self.rate_limit_remaining = remaining
+                            if remaining < 50:
+                                self.stop_for_rate_limit.set()
+                        except ValueError:
+                            pass
                     return response.read()
             except urllib.error.HTTPError as error:
                 if error.code == 404:
@@ -1058,6 +1071,48 @@ def merge_candidates(candidates):
     return [merged[key] for key in order]
 
 
+def repository_key(module):
+    repo_url = module.get("repoUrl", "")
+    match = GITHUB_REFERENCE.match(repo_url)
+    return "{}/{}".format(match.group(1), match.group(2)).lower() if match else None
+
+
+def load_existing_catalog(path):
+    try:
+        catalog = json.loads(Path(path).read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {"modules": []}, {}, {}
+    if not isinstance(catalog, dict) or not isinstance(catalog.get("modules"), list):
+        raise ValueError("existing catalog must contain a modules array")
+    by_repo = {}
+    by_id = {}
+    for module in catalog["modules"]:
+        if not isinstance(module, dict):
+            continue
+        module_id = module.get("id")
+        if module_id:
+            by_id[module_id.lower()] = module
+        key = repository_key(module)
+        if key:
+            by_repo[key] = module
+    return catalog, by_repo, by_id
+
+
+def should_refresh(full_name, info, by_repo, by_id, full_refresh):
+    if full_refresh:
+        return True
+    key = full_name.lower()
+    existing = by_repo.get(key)
+    if existing is None:
+        # Repository names are often also module IDs; retain that lookup fallback.
+        existing = by_id.get(full_name.rsplit("/", 1)[-1].lower())
+    if existing is None:
+        return True
+    pushed_at = to_epoch_ms((info or {}).get("pushed_at"))
+    stored_at = parse_int(existing.get("updatedAt"))
+    return pushed_at > stored_at
+
+
 def validate_catalog(catalog):
     if not isinstance(catalog, dict):
         raise ValueError("catalog must be a JSON object")
@@ -1128,6 +1183,9 @@ def parse_args():
     )
     parser.add_argument("--validate-only", metavar="FILE", help="validate an existing catalog")
     parser.add_argument("--allow-empty", action="store_true", help="write an empty catalog")
+    parser.add_argument(
+        "--full-refresh", action="store_true", help="refresh details for all discovered repositories"
+    )
     return parser.parse_args()
 
 
@@ -1149,6 +1207,12 @@ def run():
     if not token:
         print("warning: GITHUB_TOKEN is not set, anonymous rate limits apply", file=sys.stderr)
 
+    try:
+        existing_catalog, existing_by_repo, existing_by_id = load_existing_catalog(args.out)
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        print("could not load existing catalog: {}".format(error), file=sys.stderr)
+        return 1
+
     warnings = []
     candidates = [] if args.no_seeds else [(name, None) for name in SEED_REPOS]
     candidates += [(name, None) for name in args.include]
@@ -1158,19 +1222,32 @@ def run():
             candidates += discover_repositories(github, remaining, warnings)
 
     unique_candidates = merge_candidates(candidates)[: max(0, args.max_repos)]
+    refresh_candidates = [
+        (full_name, info)
+        for full_name, info in unique_candidates
+        if should_refresh(full_name, info, existing_by_repo, existing_by_id, args.full_refresh)
+    ]
+    skipped = len(unique_candidates) - len(refresh_candidates)
     workers = max(1, args.workers)
 
     print(
-        "inspecting {} repositories with {} workers".format(len(unique_candidates), workers),
+        "refreshing {} repositories with {} workers ({} unchanged skipped)".format(
+            len(refresh_candidates), workers, skipped
+        ),
         file=sys.stderr,
     )
     modules = []
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {
             pool.submit(build_module, github, full_name, info, warnings): full_name
-            for full_name, info in unique_candidates
+            for full_name, info in refresh_candidates
         }
         for future in as_completed(futures):
+            if github.stop_for_rate_limit.is_set():
+                warnings.append("GitHub API rate limit below 50; stopping detail refresh")
+                for pending in futures:
+                    pending.cancel()
+                break
             full_name = futures[future]
             try:
                 module = future.result()
@@ -1189,7 +1266,13 @@ def run():
                     file=sys.stderr,
                 )
 
-    by_id = {}
+            if github.stop_for_rate_limit.is_set():
+                warnings.append("GitHub API rate limit below 50; stopping detail refresh")
+                for pending in futures:
+                    pending.cancel()
+                break
+
+    by_id = {module.get("id"): module for module in existing_catalog["modules"] if module.get("id")}
     for module in modules:
         previous = by_id.get(module["id"])
         if previous is None or (module["stars"], module["updatedAt"]) > (
@@ -1197,9 +1280,7 @@ def run():
             previous["updatedAt"],
         ):
             by_id[module["id"]] = module
-    ordered = sorted(
-        by_id.values(), key=lambda item: (-item["stars"], item["name"].lower(), item["id"])
-    )
+    ordered = sorted(by_id.values(), key=lambda item: (-item["stars"], item["name"].lower(), item["id"]))
     catalog = {"modules": ordered}
 
     try:

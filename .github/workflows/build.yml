@@ -27,6 +27,9 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
+      - name: Run ScriptAnalyzer unit tests
+        run: ./gradlew testDebugUnitTest
+
       - name: Prepare release signing key
         if: startsWith(github.ref, 'refs/tags/v')
         env:

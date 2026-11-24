@@ -1,6 +1,6 @@
 # Hercules
 
-Hercules is an Android app for browsing and installing modules on rooted devices. This repository contains version 1.0.0.
+Hercules is an Android app for browsing and installing modules on rooted devices. This repository contains version 1.0.1.
 
 ## Features
 
@@ -10,6 +10,10 @@ Hercules is an Android app for browsing and installing modules on rooted devices
 - Check installed modules and available updates.
 - Enable or disable the Haze Liquid Glass interface in Settings.
 - Fall back to the bundled catalog when the remote catalog is unavailable.
+
+## Security
+
+Script inspection checks selected installer scripts for common risky patterns. See [SECURITY.md](SECURITY.md) for the inspected archive entries, detection rules, limitations, and reporting instructions.
 
 ## Requirements
 

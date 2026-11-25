@@ -2,12 +2,15 @@ package app.hercules.store.ui
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Search
@@ -312,13 +315,17 @@ private fun SettingsSheet(
     var catalogUrls by rememberSaveable { mutableStateOf(initialCatalogUrls) }
     var catalogDraft by rememberSaveable { mutableStateOf("") }
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = androidx.compose.ui.graphics.Color.Transparent) {
-        Column(
+        Box(
             Modifier.fillMaxWidth().glassSurface(hazeState, glassEnabled, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                .padding(horizontal = 20.dp, vertical = 16.dp)
-                .navigationBarsPadding()
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            Column(
+                Modifier.fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 16.dp)
+                    .navigationBarsPadding()
+                    .padding(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
             Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.titleLarge)
             Text(stringResource(R.string.settings_language), style = MaterialTheme.typography.titleMedium)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -388,6 +395,7 @@ private fun SettingsSheet(
                 Text("vuloid/hercules", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
                 Text(stringResource(R.string.settings_build_version), style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
             }
+        }
         }
     }
 }

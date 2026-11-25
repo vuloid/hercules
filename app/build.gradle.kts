@@ -21,8 +21,8 @@ android {
         applicationId = "app.hercules.store"
         minSdk = 26
         targetSdk = 35
-        versionCode = 6
-        versionName = "1.2.1"
+        versionCode = 7
+        versionName = "1.3.0"
         val catalogHost = "raw." + "githubusercontent.com"
         val catalogPath = "/vuloid/hercules/main/catalog/modules.json"
         buildConfigField("String", "CATALOG_URL", "\"https://$catalogHost$catalogPath\"")

@@ -1,8 +1,10 @@
 package app.hercules.store.data.remote
 
+import android.util.Log
 import app.hercules.store.data.model.DownloadState
 import app.hercules.store.data.model.ModuleCatalog
 import app.hercules.store.data.model.ModuleItem
+import app.hercules.store.data.model.RootManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -13,6 +15,15 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
@@ -24,11 +35,99 @@ class ModuleApi(private val client: OkHttpClient) {
     private val json = Json {
         ignoreUnknownKeys = true
         coerceInputValues = true
+        isLenient = true
     }
 
     suspend fun fetchCatalog(url: String): List<ModuleItem> = withContext(Dispatchers.IO) {
-        json.decodeFromString<ModuleCatalog>(getText(url)).modules
+        val raw = fetchCatalogText(url)
+        val mmrlModules = parseMmrlModules(raw)
+        val isMmrl = mmrlModules.any { it.versions.isNotEmpty() && it.downloadUrl.isBlank() }
+        if (isMmrl) {
+            mmrlModules.mapNotNull(::mapMmrlModule)
+        } else {
+            json.decodeFromString<ModuleCatalog>(raw).modules
+        }
     }
+
+    private fun parseMmrlModules(raw: String): List<MmrlModule> = runCatching {
+        val modulesEl = json.parseToJsonElement(raw).jsonObject["modules"] ?: return@runCatching emptyList()
+        when (modulesEl) {
+            is JsonArray -> modulesEl.mapNotNull { el ->
+                runCatching { json.decodeFromJsonElement<MmrlModule>(el) }
+                    .onFailure { Log.w("ModuleApi", "Skipping malformed MMRL module", it) }
+                    .getOrNull()
+            }
+            is JsonObject -> modulesEl.entries.mapNotNull { (key, value) ->
+                runCatching {
+                    val mod = json.decodeFromJsonElement<MmrlModule>(value)
+                    if (mod.id.isBlank()) mod.copy(id = key) else mod
+                }.onFailure { Log.w("ModuleApi", "Skipping malformed MMRL module $key", it) }
+                    .getOrNull()
+            }
+            else -> emptyList()
+        }
+    }.onFailure { Log.w("ModuleApi", "Failed to parse MMRL catalog", it) }
+        .getOrDefault(emptyList())
+
+    private fun fetchCatalogText(url: String): String {
+        val cleanPath = url.substringBefore('?')
+        if (cleanPath.endsWith(".json", ignoreCase = true)) {
+            return getText(url)
+        }
+        val trimmed = cleanPath.trimEnd('/')
+        val base = if (trimmed.endsWith("/index.html", ignoreCase = true)) {
+            trimmed.dropLast("/index.html".length).trimEnd('/')
+        } else {
+            trimmed
+        }
+        return try {
+            getText("$base/json/modules.json")
+        } catch (_: IOException) {
+            getText("$base/modules.json")
+        }
+    }
+
+    private fun mapMmrlModule(module: MmrlModule): ModuleItem? {
+        val latest = module.versions
+            .sortedByDescending { it.versionCode }
+            .firstOrNull { it.zipUrl.startsWith("https://", ignoreCase = true) }
+            ?: return null
+        val ts = latest.timestamp.toLong()
+        val updatedAt = if (ts > 1_000_000_000_000L) ts else ts * 1000L
+        val changelog = if (
+            latest.changelog.startsWith("http://", ignoreCase = true) ||
+            latest.changelog.startsWith("https://", ignoreCase = true)
+        ) "" else latest.changelog
+        val managers = mapRootManagers(module.root)
+        val lsposed = hasXposedMarker(module.id) || module.categories.any(::hasXposedMarker)
+        return ModuleItem(
+            id = module.id,
+            name = module.name.ifBlank { module.id },
+            author = module.author,
+            description = module.description,
+            version = latest.version,
+            versionCode = latest.versionCode,
+            updatedAt = updatedAt,
+            downloadUrl = latest.zipUrl,
+            repoUrl = module.track?.source.orEmpty(),
+            managers = managers,
+            lsposed = lsposed,
+            changelog = changelog
+        )
+    }
+
+    private fun mapRootManagers(root: MmrlRoot?): List<RootManager> {
+        if (root == null) return listOf(RootManager.MAGISK, RootManager.KERNELSU, RootManager.APATCH)
+        val result = buildList {
+            if (root.magisk != null && root.magisk !is JsonNull) add(RootManager.MAGISK)
+            if (root.kernelsu != null && root.kernelsu !is JsonNull) add(RootManager.KERNELSU)
+            if (root.apatch != null && root.apatch !is JsonNull) add(RootManager.APATCH)
+        }
+        return result.ifEmpty { listOf(RootManager.MAGISK, RootManager.KERNELSU, RootManager.APATCH) }
+    }
+
+    private fun hasXposedMarker(value: String): Boolean =
+        value.contains("xposed", ignoreCase = true) || value.contains("lsposed", ignoreCase = true)
 
     suspend fun fetchGithubModule(owner: String, repo: String): ModuleItem = withContext(Dispatchers.IO) {
         val base = "https://api.github.com/repos/$owner/$repo"
@@ -145,3 +244,50 @@ internal data class GithubAsset(
     val size: Long = 0,
     @SerialName("browser_download_url") val url: String
 )
+
+@Serializable
+private data class MmrlModule(
+    val id: String = "",
+    val name: String = "",
+    val author: String = "",
+    val description: String = "",
+    val downloadUrl: String = "",
+    val categories: List<String> = emptyList(),
+    val versions: List<MmrlVersion> = emptyList(),
+    val track: MmrlTrack? = null,
+    val root: MmrlRoot? = null
+)
+
+@Serializable
+private data class MmrlRoot(
+    val magisk: JsonElement? = null,
+    val kernelsu: JsonElement? = null,
+    val apatch: JsonElement? = null
+)
+
+@Serializable
+private data class MmrlVersion(
+    val timestamp: Double = 0.0,
+    val version: String = "",
+    @Serializable(with = FlexibleIntSerializer::class) val versionCode: Int = 0,
+    val zipUrl: String = "",
+    val changelog: String = ""
+)
+
+private object FlexibleIntSerializer : kotlinx.serialization.KSerializer<Int> {
+    override val descriptor = kotlinx.serialization.descriptors.PrimitiveSerialDescriptor(
+        "FlexibleInt", kotlinx.serialization.descriptors.PrimitiveKind.INT
+    )
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: Int) = encoder.encodeInt(value)
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): Int {
+        val el = (decoder as? kotlinx.serialization.json.JsonDecoder)?.decodeJsonElement()
+            ?: return decoder.decodeInt()
+        return when (el) {
+            is JsonPrimitive -> el.intOrNull ?: el.content.trim().toIntOrNull() ?: 0
+            else -> 0
+        }
+    }
+}
+
+@Serializable
+private data class MmrlTrack(val source: String = "")

@@ -1,5 +1,6 @@
 package app.hercules.store.data
 
+import android.util.Log
 import app.hercules.store.data.model.CatalogState
 import app.hercules.store.data.model.DownloadState
 import app.hercules.store.data.model.ModuleItem
@@ -52,7 +53,8 @@ class ModuleRepository(
                     api.fetchCatalog(url)
                 } catch (e: CancellationException) {
                     throw e
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    Log.w("ModuleRepository", "Failed to fetch custom catalog: $url", e)
                     emptyList()
                 }
             }

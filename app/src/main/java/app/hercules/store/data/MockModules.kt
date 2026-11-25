@@ -88,7 +88,7 @@ object MockModules {
             name = "Shamiko",
             author = "LSPosed",
             description = "Hides root and Zygisk from selected applications by working with the enforced denylist.",
-            version = "v1.2.1",
+            version = "v1.3.0",
             versionCode = 1021,
             stars = 1190,
             updatedAt = ago(95),
